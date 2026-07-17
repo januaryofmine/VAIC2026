@@ -2,6 +2,11 @@
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: false },
+  modules: ["@nuxt/ui"],
+  css: ["~/assets/css/main.css"],
+  app: {
+    head: { title: "Paperless Meetings" },
+  },
   runtimeConfig: {
     // NUXT_RETRIEVAL_API_HOST overrides in prod
     retrievalApiHost: "http://localhost:8001",
