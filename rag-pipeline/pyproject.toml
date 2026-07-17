@@ -1,0 +1,23 @@
+[project]
+name = "rag-pipeline"
+version = "0.1.0"
+description = "Paperless Meetings ingestion: parse -> chunk -> embed -> Postgres/pgvector"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pgvector>=0.4.2",
+    "psycopg[binary]>=3.2.13",
+    "python-docx>=1.1.2",
+    "sentence-transformers>=3.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+markers = [
+    "integration: needs a live Postgres (DATABASE_URL)",
+]

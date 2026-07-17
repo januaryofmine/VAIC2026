@@ -1,6 +1,7 @@
 # personal working docs + local claude workflow (not committed)
 local/
 .claude/
+test_docs/
 
 # secrets  ← QUAN TRỌNG NHẤT
 .env
