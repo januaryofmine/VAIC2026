@@ -1,7 +1,7 @@
 [project]
 name = "retrieval-api"
 version = "0.1.0"
-description = "Paperless Meetings retrieval API (documents plain-fetch; vector search added in Slice 4)"
+description = "Paperless Meetings retrieval API: documents plain-fetch + vector search (Q&A)"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
@@ -9,6 +9,8 @@ dependencies = [
     "psycopg[binary]>=3.2.0",
     "pgvector>=0.4.2",
     "pydantic-settings>=2.7.0",
+    "sentence-transformers>=3.0.0",
+    "anthropic>=0.86.0",
 ]
 
 [dependency-groups]

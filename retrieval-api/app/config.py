@@ -5,6 +5,16 @@ class Settings(BaseSettings):
     database_url: str = ""
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # embedding (query side) — must match the ingestion model (multilingual-e5-large)
+    embedding_model: str = "intfloat/multilingual-e5-large"
+    embedding_prefix_query: str = "query: "
+    retrieval_top_k: int = 5
+
+    # reformulation (optional LLM query rewrite). "none" = passthrough (no LLM call).
+    reformulation_provider: str = "none"  # "none" | "anthropic"
+    reformulation_model: str = "claude-haiku-4-5-20251001"
+    anthropic_api_key: str = ""
+
     model_config = {"env_file": "../.env", "extra": "ignore"}
 
 

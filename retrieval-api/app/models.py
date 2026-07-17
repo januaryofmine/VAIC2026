@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel
 
 
@@ -18,3 +20,24 @@ class FullDocumentResponse(BaseModel):
     status: str
     chunk_count: int
     chunks: list[DocumentChunk]
+
+
+class RetrieveRequest(BaseModel):
+    question: str
+    document_id: UUID  # Q&A is always scoped to one document
+    top_k: int | None = None
+    history: list[dict[str, str]] | None = None
+
+
+class RetrieveChunk(BaseModel):
+    id: str
+    position: int
+    page: int | None
+    section: str | None
+    text: str
+    score: float  # cosine similarity (1 = identical)
+
+
+class RetrieveResponse(BaseModel):
+    chunks: list[RetrieveChunk]
+    reformulated_query: str
