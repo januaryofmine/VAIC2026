@@ -27,17 +27,22 @@ export default defineEventHandler(async (event) => {
   }
 
   // Save under a unique temp dir keeping the ORIGINAL name (basename strips any
-  // path traversal) so ingest.py records the real filename, not a temp one.
+  // path traversal). The dir is removed only when the background ingest exits.
   const safeName = basename(filePart.filename);
   const dir = await mkdtemp(join(tmpdir(), "paperless-"));
   const tmpPath = join(dir, safeName);
   await writeFile(tmpPath, filePart.data);
 
+  const ragPipelineDir = resolve(process.cwd(), config.ingest.ragPipelineDir);
   try {
-    const ragPipelineDir = resolve(process.cwd(), config.ingest.ragPipelineDir);
-    const documentId = await runIngestion(tmpPath, ragPipelineDir);
-    return { document_id: documentId, filename: safeName, doc_type: docType };
-  } finally {
-    await rm(dir, { recursive: true, force: true });
+    // Resolves as soon as the document row exists (id emitted early); ingestion
+    // continues in the background and updates documents.status. Cleanup on exit.
+    const documentId = await startIngestion(tmpPath, ragPipelineDir, () => {
+      void rm(dir, { recursive: true, force: true });
+    });
+    return { document_id: documentId, filename: safeName, doc_type: docType, status: "processing" };
+  } catch (e) {
+    void rm(dir, { recursive: true, force: true });
+    throw createError({ statusCode: 500, statusMessage: "failed to start ingestion" });
   }
 });

@@ -58,3 +58,29 @@ def test_ingest_persists_citation_metadata(conn, monkeypatch, tmp_path):
         with conn.cursor() as cur:
             cur.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
         conn.commit()
+
+
+def test_ingest_marks_failed_when_no_text(conn, monkeypatch, tmp_path):
+    # parse yields no blocks → no chunks → ingest raises, and the row it created
+    # up front must be left as status='failed' (async caller polls this).
+    monkeypatch.setattr(ingest, "parse", lambda _p: ParsedDoc(blocks=(), page_count=0))
+    f = tmp_path / "empty-unique-9x.pdf"
+    f.write_bytes(b"%PDF fake")
+
+    with pytest.raises(ValueError):
+        ingest.ingest(str(f), conn, FakeEmbedder())
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, status FROM documents WHERE filename = 'empty-unique-9x.pdf' "
+            "ORDER BY uploaded_at DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+    try:
+        assert row is not None
+        assert row[1] == "failed"
+    finally:
+        if row:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM documents WHERE id = %s", (row[0],))
+            conn.commit()

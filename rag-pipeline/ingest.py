@@ -20,13 +20,21 @@ from parse import parse
 def ingest(path: str | Path, conn, embedder: Embedder) -> str:
     p = Path(path)
     doc_type = p.suffix.lower().lstrip(".")
-    parsed = parse(p)
-    chunks = chunk_blocks(parsed.blocks)
-    if not chunks:
-        raise ValueError(f"No text extracted from {p}")
 
-    doc_id = db.insert_document(conn, p.name, doc_type, parsed.page_count)
+    # Create the row FIRST (status='pending') so the id exists immediately and an
+    # async caller can return right away; heavy work then updates status.
+    doc_id = db.insert_document(conn, p.name, doc_type, status="pending")
+    print(f"document_id={doc_id}", flush=True)  # emit early for async upload
+
     try:
+        db.set_status(conn, doc_id, "parsing")
+        parsed = parse(p)
+        db.update_page_count(conn, doc_id, parsed.page_count)
+        chunks = chunk_blocks(parsed.blocks)
+        if not chunks:
+            raise ValueError(f"No text extracted from {p}")
+
+        db.set_status(conn, doc_id, "embedding")
         embeddings = embedder.embed_documents([c.text for c in chunks])
         db.insert_chunks(conn, doc_id, chunks, embeddings)
         db.set_status(conn, doc_id, "ready")
@@ -58,7 +66,7 @@ def main() -> None:
             )
             total, with_page, with_section = cur.fetchone()
         print(
-            f"document_id={doc_id}  chunks={total}  "
+            f"[ingest done] chunks={total}  "
             f"with_page={with_page}  with_section={with_section}"
         )
     finally:

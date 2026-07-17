@@ -5,8 +5,8 @@ import psycopg
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps import get_db
-from app.models import DocumentChunk, FullDocumentResponse
-from app.services.documents import fetch_full_document
+from app.models import DocumentChunk, DocumentStatusResponse, FullDocumentResponse
+from app.services.documents import fetch_document_status, fetch_full_document
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -30,6 +30,17 @@ def get_full_document(
         chunk_count=len(doc["chunks"]),
         chunks=[DocumentChunk(**c) for c in doc["chunks"]],
     )
+
+
+@router.get("/documents/{document_id}/status", response_model=DocumentStatusResponse)
+def get_document_status(
+    document_id: UUID,
+    conn: psycopg.Connection = Depends(get_db),
+) -> DocumentStatusResponse:
+    row = fetch_document_status(conn, str(document_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    return DocumentStatusResponse(**row)
 
 
 @router.get("/healthz")

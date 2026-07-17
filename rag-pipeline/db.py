@@ -20,17 +20,32 @@ def connect(database_url: str) -> psycopg.Connection:
 
 
 def insert_document(
-    conn: psycopg.Connection, filename: str, doc_type: str, page_count: int | None
+    conn: psycopg.Connection,
+    filename: str,
+    doc_type: str,
+    page_count: int | None = None,
+    status: str = "pending",
 ) -> str:
     with conn.cursor() as cur:
         cur.execute(
             "INSERT INTO documents (filename, doc_type, page_count, status) "
-            "VALUES (%s, %s, %s, 'embedding') RETURNING id",
-            (filename, doc_type, page_count),
+            "VALUES (%s, %s, %s, %s) RETURNING id",
+            (filename, doc_type, page_count, status),
         )
         doc_id = cur.fetchone()[0]
     conn.commit()
     return str(doc_id)
+
+
+def update_page_count(
+    conn: psycopg.Connection, document_id: str, page_count: int | None
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE documents SET page_count = %s WHERE id = %s",
+            (page_count, document_id),
+        )
+    conn.commit()
 
 
 def insert_chunks(

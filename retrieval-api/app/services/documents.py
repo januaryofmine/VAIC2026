@@ -24,6 +24,23 @@ _CHUNKS_SQL = """
 """
 
 
+_STATUS_SQL = """
+    SELECT
+        d.id::text AS document_id, d.filename, d.doc_type, d.status, d.page_count,
+        (SELECT count(*) FROM chunks c WHERE c.document_id = d.id) AS chunk_count
+    FROM documents d
+    WHERE d.id = %(id)s::uuid
+"""
+
+
+def fetch_document_status(conn: psycopg.Connection, document_id: str) -> dict | None:
+    """Lightweight status for polling during async ingestion (no chunk text)."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(_STATUS_SQL, {"id": document_id})
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
 def fetch_full_document(conn: psycopg.Connection, document_id: str) -> dict | None:
     """Return {document fields..., "chunks": [...]} or None if the document is absent."""
     with conn.cursor(row_factory=dict_row) as cur:

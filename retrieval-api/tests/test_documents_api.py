@@ -57,5 +57,29 @@ def test_invalid_uuid_is_422():
     assert r.status_code == 422
 
 
+def test_status_ok(monkeypatch):
+    monkeypatch.setattr(
+        documents_router,
+        "fetch_document_status",
+        lambda conn, doc_id: {
+            "document_id": _DOC_ID,
+            "filename": "x.pdf",
+            "doc_type": "pdf",
+            "status": "embedding",
+            "page_count": 3,
+            "chunk_count": 12,
+        },
+    )
+    r = _client().get(f"/api/documents/{_DOC_ID}/status")
+    assert r.status_code == 200
+    assert r.json()["status"] == "embedding"
+    assert r.json()["chunk_count"] == 12
+
+
+def test_status_404(monkeypatch):
+    monkeypatch.setattr(documents_router, "fetch_document_status", lambda conn, doc_id: None)
+    assert _client().get(f"/api/documents/{_DOC_ID}/status").status_code == 404
+
+
 def test_healthz():
     assert _client().get("/api/healthz").json() == {"status": "ok"}
