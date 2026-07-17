@@ -1,11 +1,11 @@
 export default defineEventHandler(async (event) => {
   const doc = await loadDocumentForPrepPack(event);
   const { ai } = useRuntimeConfig();
-  const summary = await summarizeDocument(
+  const { terms } = await mapReduceDocument(
     doc.chunks,
-    createAnthropicSummarizer(),
+    createAnthropicTermsExtractor(),
     ai.mapGroupChars,
     ai.mapConcurrency,
   );
-  return { document_id: doc.document_id, filename: doc.filename, summary };
+  return { document_id: doc.document_id, filename: doc.filename, terms };
 });
