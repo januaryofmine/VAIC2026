@@ -10,8 +10,9 @@ class Config:
     embedding_prefix_query: str
     embedding_vector_dim: int
     embedding_batch_size: int
-    chunk_max_chars: int
-    chunk_min_chars: int
+    chunk_max_tokens: int       # token budget per chunk (stay under e5's 512 limit)
+    chunk_overlap_tokens: int   # overlap between consecutive chunks in a section
+    chunk_min_chars: int        # drop noise fragments shorter than this
 
 
 _defaults = Config(
@@ -21,8 +22,9 @@ _defaults = Config(
     embedding_prefix_query="query: ",        # e5: prefix for search queries
     embedding_vector_dim=1024,               # multilingual-e5-large
     embedding_batch_size=32,
-    chunk_max_chars=1500,
-    chunk_min_chars=200,
+    chunk_max_tokens=400,
+    chunk_overlap_tokens=60,   # ~15%
+    chunk_min_chars=40,
 )
 
 
@@ -41,6 +43,7 @@ config = Config(
     ),
     embedding_vector_dim=_int("EMBEDDING_VECTOR_DIM", _defaults.embedding_vector_dim),
     embedding_batch_size=_int("EMBEDDING_BATCH_SIZE", _defaults.embedding_batch_size),
-    chunk_max_chars=_int("CHUNK_MAX_CHARS", _defaults.chunk_max_chars),
+    chunk_max_tokens=_int("CHUNK_MAX_TOKENS", _defaults.chunk_max_tokens),
+    chunk_overlap_tokens=_int("CHUNK_OVERLAP_TOKENS", _defaults.chunk_overlap_tokens),
     chunk_min_chars=_int("CHUNK_MIN_CHARS", _defaults.chunk_min_chars),
 )
