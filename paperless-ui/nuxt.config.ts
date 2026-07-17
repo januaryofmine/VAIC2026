@@ -16,5 +16,10 @@ export default defineNuxtConfig({
       mapGroupChars: 30000,
       mapConcurrency: 10,
     },
+    ingest: {
+      // resolved relative to the server cwd (paperless-ui). NUXT_INGEST_RAG_PIPELINE_DIR overrides.
+      ragPipelineDir: "../rag-pipeline",
+      maxFileMb: 25,
+    },
   },
 });
