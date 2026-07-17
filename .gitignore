@@ -1,0 +1,33 @@
+# personal working docs + local claude workflow (not committed)
+local/
+.claude/
+
+# secrets  ← QUAN TRỌNG NHẤT
+.env
+.env.*
+!.env.sample
+
+# python (rag-pipeline, retrieval-api)
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# node / nuxt (advisor-ui)
+node_modules/
+.nuxt/
+.output/
+dist/
+.data/
+
+# db dumps / uploaded files
+*.dump
+uploads/
+
+# git worktrees (pipeline tạo ở .worktrees/)
+.worktrees/
+
+# os
+.DS_Store
