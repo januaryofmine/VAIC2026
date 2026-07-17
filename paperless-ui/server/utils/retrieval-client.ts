@@ -14,10 +14,11 @@ export async function retrieveChunks(
   question: string,
   documentId: string,
   history: HistoryEntry[],
+  topK?: number,
 ): Promise<RetrieveResponse> {
   const config = useRuntimeConfig();
   return await $fetch<RetrieveResponse>(`${config.retrievalApiHost}/api/retrieve`, {
     method: "POST",
-    body: { question, document_id: documentId, history },
+    body: { question, document_id: documentId, history, top_k: topK },
   });
 }
