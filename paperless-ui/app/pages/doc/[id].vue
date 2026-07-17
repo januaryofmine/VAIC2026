@@ -42,6 +42,7 @@ const {
           :pending="questionsPending"
           :error="questionsError"
         />
+        <ChatPanel :document-id="documentId" />
       </div>
       <template #fallback>
         <p class="text-sm text-[var(--ui-text-muted)]">Đang tải…</p>
