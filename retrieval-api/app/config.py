@@ -8,7 +8,12 @@ class Settings(BaseSettings):
     # embedding (query side) — must match the ingestion model (multilingual-e5-large)
     embedding_model: str = "intfloat/multilingual-e5-large"
     embedding_prefix_query: str = "query: "
-    retrieval_top_k: int = 5
+
+    # hybrid retrieval (dense vector + Postgres full-text, fused with RRF)
+    retrieval_top_k: int = 10
+    over_fetch_multiplier: int = 6  # candidate pool per arm = top_k * this
+    rrf_k: int = 60  # reciprocal rank fusion constant
+    min_chunk_chars: int = 30  # skip noise chunks (headings/page numbers) at query time
 
     # reformulation (optional LLM query rewrite). "none" = passthrough (no LLM call).
     reformulation_provider: str = "none"  # "none" | "anthropic"

@@ -27,7 +27,15 @@ def retrieve_endpoint(
         anthropic_api_key=settings.anthropic_api_key,
     )
     top_k = req.top_k or settings.retrieval_top_k
-    rows = retrieve(conn, reformulated, str(req.document_id), top_k)
+    rows = retrieve(
+        conn,
+        reformulated,
+        str(req.document_id),
+        top_k,
+        over_fetch_multiplier=settings.over_fetch_multiplier,
+        rrf_k=settings.rrf_k,
+        min_chunk_chars=settings.min_chunk_chars,
+    )
     logger.info(
         "retrieve doc=%s q=%r -> %d chunks", req.document_id, reformulated, len(rows)
     )
