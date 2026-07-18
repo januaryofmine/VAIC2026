@@ -5,6 +5,7 @@ import type {
   RetrieveResponse,
 } from "../types/retrieval";
 import type { HistoryEntry } from "./chat-context";
+import { apiKeyHeaders } from "./retrieval-http";
 
 /** Upsert the GitHub user in Postgres (retrieval-api) and get our internal id (Slice 18). */
 export async function upsertUser(profile: {
@@ -17,6 +18,7 @@ export async function upsertUser(profile: {
   return await $fetch<AppUser>(`${config.retrievalApiHost}/api/users/upsert`, {
     method: "POST",
     body: profile,
+    headers: apiKeyHeaders(config.retrievalApiKey),
   });
 }
 
@@ -28,6 +30,7 @@ export async function listDocuments(
   const config = useRuntimeConfig();
   return await $fetch<DocumentListResponse>(`${config.retrievalApiHost}/api/documents`, {
     query: { user_id: userId, ...filters },
+    headers: apiKeyHeaders(config.retrievalApiKey),
   });
 }
 
@@ -36,6 +39,7 @@ export async function fetchFullDocument(documentId: string): Promise<FullDocumen
   const config = useRuntimeConfig();
   return await $fetch<FullDocument>(
     `${config.retrievalApiHost}/api/documents/${documentId}/full`,
+    { headers: apiKeyHeaders(config.retrievalApiKey) },
   );
 }
 
@@ -50,5 +54,6 @@ export async function retrieveChunks(
   return await $fetch<RetrieveResponse>(`${config.retrievalApiHost}/api/retrieve`, {
     method: "POST",
     body: { question, document_id: documentId, history, top_k: topK },
+    headers: apiKeyHeaders(config.retrievalApiKey),
   });
 }

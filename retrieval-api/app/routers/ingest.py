@@ -4,12 +4,15 @@ Local dev: the Nuxt UI shells out to rag-pipeline directly. In the cloud (UI on
 Vercel = serverless Node, no Python), that can't work — so the container that
 co-locates retrieval-api + rag-pipeline exposes ingestion over HTTP here.
 
-rag-pipeline is imported lazily (its modules live on RAG_PIPELINE_DIR, added to
-sys.path only when this endpoint is first hit) so importing this router never
-requires rag-pipeline to be present — local retrieval-api keeps working.
+Async: the heavy parse/embed runs on a background thread. We return the moment the
+document row exists (via rag-pipeline's `on_created` hook) with status "processing"
+— mirroring the local subprocess flow — so the UI returns fast and polls
+`/documents/{id}/status`. Blocking waits are fine here: this is a sync endpoint,
+so FastAPI runs it in a threadpool (the event loop is never blocked).
 
-This deploy keeps the self-hosted e5 embedder (no provider swap), so ingestion
-uses rag-pipeline's E5Embedder directly, reused across uploads.
+rag-pipeline is imported lazily (RAG_PIPELINE_DIR on sys.path) so importing this
+router never requires rag-pipeline to be present — local retrieval-api keeps working.
+This deploy keeps the self-hosted e5 embedder (no provider swap).
 """
 
 import logging
@@ -17,9 +20,10 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.config import get_settings
 
@@ -31,6 +35,10 @@ router = APIRouter()
 RAG_PIPELINE_DIR = os.environ.get("RAG_PIPELINE_DIR", "/app/rag-pipeline")
 
 _embedder = None  # reuse one E5 embedder across uploads
+
+# How long to wait for the row to be created before giving up (parse of a big PDF
+# can take a few seconds before the id is emitted; embedding continues after).
+_EARLY_TIMEOUT_S = 120
 
 
 def _load_rag():
@@ -44,7 +52,10 @@ def _load_rag():
 
 
 @router.post("/ingest")
-async def ingest_endpoint(file: UploadFile = File(...)) -> dict:
+def ingest_endpoint(
+    file: UploadFile = File(...),
+    user_id: str | None = Form(default=None),
+) -> dict:
     settings = get_settings()
     if not settings.database_url:
         raise HTTPException(status_code=500, detail="DATABASE_URL not configured")
@@ -54,7 +65,7 @@ async def ingest_endpoint(file: UploadFile = File(...)) -> dict:
     if suffix not in (".pdf", ".docx"):
         raise HTTPException(status_code=400, detail="only .pdf or .docx accepted")
 
-    data = await file.read()
+    data = file.file.read()  # sync endpoint → read the underlying file directly
     max_bytes = settings.max_upload_mb * 1024 * 1024
     if len(data) > max_bytes:
         raise HTTPException(
@@ -74,20 +85,41 @@ async def ingest_endpoint(file: UploadFile = File(...)) -> dict:
     # Preserve the original filename (rag_ingest records Path(path).name).
     tmpdir = tempfile.mkdtemp()
     tmp_path = Path(tmpdir) / name
-    try:
-        tmp_path.write_bytes(data)
-        conn = rag_db.connect(settings.database_url)
-        try:
-            doc_id = rag_ingest(str(tmp_path), conn, _embedder)
-        finally:
-            conn.close()
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("ingest failed for %s: %s", name, e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"ingest failed: {e}")
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
+    tmp_path.write_bytes(data)
 
-    logger.info("ingested %s -> document_id=%s", name, doc_id)
-    return {"document_id": doc_id, "filename": name}
+    created: dict = {}
+    failure: dict = {}
+    ready = threading.Event()
+
+    def _on_created(doc_id: str) -> None:
+        created["id"] = doc_id
+        ready.set()
+
+    def _run() -> None:
+        try:
+            conn = rag_db.connect(settings.database_url)
+            try:
+                rag_ingest(
+                    str(tmp_path), conn, _embedder,
+                    user_id=user_id, on_created=_on_created,
+                )
+            finally:
+                conn.close()
+        except Exception as e:  # unblock the waiter so it can report the failure
+            logger.error("ingest failed for %s: %s", name, e, exc_info=True)
+            failure["error"] = str(e)
+            ready.set()
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+    if not ready.wait(timeout=_EARLY_TIMEOUT_S):
+        raise HTTPException(status_code=504, detail="ingestion did not start in time")
+    if "id" not in created:
+        raise HTTPException(
+            status_code=500, detail=f"ingest failed: {failure.get('error', 'unknown')}"
+        )
+
+    logger.info("ingesting %s -> document_id=%s (background)", name, created["id"])
+    return {"document_id": created["id"], "filename": name, "status": "processing"}

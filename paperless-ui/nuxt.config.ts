@@ -15,6 +15,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // NUXT_RETRIEVAL_API_HOST overrides in prod
     retrievalApiHost: "http://localhost:8001",
+    // Shared secret for the retrieval-api (X-API-Key). NUXT_RETRIEVAL_API_KEY in prod.
+    // Empty in local dev → retrieval-api leaves its endpoints open.
+    retrievalApiKey: "",
     ai: {
       // Anthropic key is read from ANTHROPIC_API_KEY by the AI SDK directly.
       summarizeMapModel: "claude-haiku-4-5-20251001", // cheap/fast for the map step
