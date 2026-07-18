@@ -54,19 +54,44 @@ function uuid(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/**
+ * Các lần gửi đang bay. Cần theo dõi vì `traceLLM` là fire-and-forget: trong môi
+ * trường sống ngắn (serverless function, script CLI, test) tiến trình có thể kết
+ * thúc TRƯỚC khi POST xong → trace mất âm thầm. Gọi `flushTraces()` để chờ.
+ */
+const pending = new Set<Promise<unknown>>();
+
+function track(p: Promise<unknown>): void {
+  pending.add(p);
+  void p.finally(() => pending.delete(p));
+}
+
+/** Chờ mọi trace đang bay gửi xong. Gọi trước khi tiến trình/handler kết thúc. */
+export async function flushTraces(): Promise<void> {
+  await Promise.allSettled([...pending]);
+}
+
 /** Gửi 1 batch sự kiện. Nuốt mọi lỗi — monitoring không được phá luồng chính. */
 async function send(events: unknown[]): Promise<void> {
   const cfg = config();
   if (!cfg || events.length === 0) return;
+  const debug = !!process.env.LLM_TRACE_DEBUG;
   try {
     const auth = Buffer.from(`${cfg.publicKey}:${cfg.secretKey}`).toString("base64");
-    await globalThis.fetch(`${cfg.baseUrl}/api/public/ingestion`, {
+    const res = await globalThis.fetch(`${cfg.baseUrl}/api/public/ingestion`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
       body: JSON.stringify({ batch: events }),
     });
-  } catch {
-    // nuốt: lỗi telemetry không bao giờ được nổi lên người dùng
+    // Ingestion trả 207: từng event có status riêng — lỗi schema nằm trong `errors`.
+    if (debug) {
+      const text = await res.clone().text();
+      console.warn(`[llm-trace] ingestion HTTP ${res.status}: ${text.slice(0, 500)}`);
+    }
+  } catch (err) {
+    // Vẫn nuốt (telemetry không được phá luồng chính) nhưng bật LLM_TRACE_DEBUG=1
+    // để thấy — im lặng tuyệt đối chính là thứ khiến lỗi này vô hình lúc đầu.
+    if (debug) console.warn("[llm-trace] ingestion failed:", err);
   }
 }
 
@@ -92,7 +117,7 @@ export function traceLLM(e: TraceLLMInput): void {
   const latencyMs = e.endTime.getTime() - e.startTime.getTime();
 
   // Sink cục bộ: bản ghi phẳng, dễ tính P50/P95 + tổng token bằng script.
-  void appendLocal({
+  track(appendLocal({
     traceId,
     name: e.name,
     model: e.model,
@@ -104,7 +129,7 @@ export function traceLLM(e: TraceLLMInput): void {
     metadata: e.metadata,
     input: e.input,
     output: e.output,
-  });
+  }));
 
   const events = [
     {
@@ -145,7 +170,7 @@ export function traceLLM(e: TraceLLMInput): void {
     },
   ];
 
-  void send(events); // không await: không chặn response
+  track(send(events)); // không await (không chặn response) nhưng có theo dõi để flushTraces() chờ được
 }
 
 /**

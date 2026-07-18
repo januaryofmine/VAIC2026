@@ -24,11 +24,12 @@ const up = await gatewayUp();
 
 describe.skipIf(!up)("llm-trace (live gateway)", () => {
   let instrumentFetch: typeof import("./llm-trace").instrumentFetch;
+  let flushTraces: typeof import("./llm-trace").flushTraces;
 
   beforeAll(async () => {
     process.env.LLM_TRACE_FILE = TRACE_FILE; // bật sink cục bộ trước khi wrap
     await rm(TRACE_FILE, { force: true });
-    ({ instrumentFetch } = await import("./llm-trace"));
+    ({ instrumentFetch, flushTraces } = await import("./llm-trace"));
   });
 
   afterAll(async () => {
@@ -53,7 +54,9 @@ describe.skipIf(!up)("llm-trace (live gateway)", () => {
     const body: any = await res.json();
     expect(body.choices?.[0]?.message).toBeDefined();
 
-    await new Promise((r) => setTimeout(r, 300)); // sink là fire-and-forget
+    // Bắt buộc: trace là fire-and-forget, tiến trình ngắn hạn (test/serverless)
+    // sẽ thoát trước khi POST xong nếu không flush → trace mất âm thầm.
+    await flushTraces();
     const lines = (await readFile(TRACE_FILE, "utf8")).trim().split("\n");
     expect(lines.length).toBeGreaterThanOrEqual(1);
 
