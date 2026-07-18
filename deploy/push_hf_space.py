@@ -97,6 +97,16 @@ def main() -> int:
     api.add_space_variable(repo_id=repo_id, key="CORS_ORIGINS", value=cors_json)
     print(f"set variable CORS_ORIGINS={cors_json}")
 
+    # Backend-driven prep-pack: after embedding, this Space calls {BFF_URL}/api/internal
+    # /prep-pack so summary/terms/questions are generated + stored without a user opening
+    # the doc. BFF_URL = the Vercel UI URL (public, not a secret). Omit → trigger off.
+    bff_url = sec.get("BFF_URL")
+    if bff_url:
+        api.add_space_variable(repo_id=repo_id, key="BFF_URL", value=bff_url)
+        print(f"set variable BFF_URL={bff_url}")
+    else:
+        print("WARN: no BFF_URL in secrets → prep-pack is generated only on doc open.")
+
     staging = Path(tempfile.mkdtemp()) / "space"
     try:
         build_staging(staging)
