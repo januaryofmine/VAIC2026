@@ -21,9 +21,46 @@ This AI application lets an official **upload a document and, in under a minute,
 
 ## Architecture
 
-Single monorepo.
+Single monorepo. Two flows: **ingestion** (once per document) and **query** (every summary / question).
 
-![Architecture](./docs/paperless.png)
+**Ingestion** — upload → searchable chunks:
+
+```mermaid
+flowchart LR
+    U([User]) -->|PDF/DOCX| NX["Nuxt<br/>/api/upload"]
+    NX --> ING["FastAPI<br/>/api/ingest"]
+    ING --> P["parse<br/>pdftotext · textutil"]
+    P --> C["chunk<br/>token + Điều-aware"]
+    C --> E["embed<br/>multilingual-e5-large"]
+    E --> DB[("Postgres 17<br/>pgvector")]
+
+    style DB fill:#1D2B4A,stroke:#C9A227,color:#fff
+```
+
+**Query** — question → grounded, cited answer:
+
+```mermaid
+flowchart LR
+    U([Question]) --> NX["Nuxt BFF<br/>/api/chat"]
+    NX -->|plan multi-query| H["Claude Haiku 4.5"]
+    H --> R["FastAPI<br/>/api/retrieve"]
+
+    subgraph HY["hybrid retrieval"]
+        direction TB
+        V["dense vector"] --> RRF["RRF fuse<br/>+ neighbor expand"]
+        F["full-text"] --> RRF
+    end
+
+    R --> V
+    R --> F
+    V -.-> DB[("Postgres 17<br/>pgvector")]
+    F -.-> DB
+    RRF -->|top-k chunks| S["Claude Sonnet 4.6"]
+    S --> A(["streamed answer<br/>cites page · Điều/Khoản"])
+
+    style DB fill:#1D2B4A,stroke:#C9A227,color:#fff
+    style S fill:#C9A227,stroke:#1D2B4A,color:#000
+```
 
 #### Updates
 
