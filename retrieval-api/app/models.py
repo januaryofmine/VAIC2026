@@ -22,6 +22,15 @@ class FullDocumentResponse(BaseModel):
     chunks: list[DocumentChunk]
 
 
+class DocumentStatusResponse(BaseModel):
+    document_id: str
+    filename: str
+    doc_type: str
+    status: str  # pending | parsing | embedding | ready | failed
+    page_count: int | None
+    chunk_count: int
+
+
 class RetrieveRequest(BaseModel):
     question: str
     document_id: UUID  # Q&A is always scoped to one document

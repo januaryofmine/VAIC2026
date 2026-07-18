@@ -26,7 +26,7 @@ def test_retrieve_ok(monkeypatch):
     monkeypatch.setattr(
         retrieve_router,
         "retrieve",
-        lambda conn, q, doc, top_k: [
+        lambda conn, q, doc, top_k, **kw: [
             {"id": "a", "position": 0, "page": 2, "section": "Điều 1", "text": "t", "score": 0.87}
         ],
     )
@@ -45,7 +45,7 @@ def test_retrieve_uses_reformulated_query(monkeypatch):
     monkeypatch.setattr(retrieve_router, "reformulate_query", lambda q, **kw: "TRUY VẤN VIẾT LẠI")
     captured = {}
 
-    def _fake_retrieve(conn, q, doc, top_k):
+    def _fake_retrieve(conn, q, doc, top_k, **kw):
         captured["q"] = q
         return []
 

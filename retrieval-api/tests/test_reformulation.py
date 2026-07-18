@@ -27,6 +27,36 @@ def test_anthropic_branch_rewrites(monkeypatch):
     assert out == "truy vấn viết lại"  # trimmed
 
 
+def test_conversational_output_falls_back_to_question(monkeypatch):
+    class _Messages:
+        def create(self, **kwargs):
+            block = type(
+                "B", (), {"text": "Tôi cần thêm thông tin.\n\n(Bạn cung cấp tên văn bản?)"}
+            )()
+            return type("Resp", (), {"content": [block]})()
+
+    class _Client:
+        def __init__(self, **kwargs):
+            self.messages = _Messages()
+
+    monkeypatch.setattr("anthropic.Anthropic", _Client)
+    out = reformulate_query("gốc", model="m", provider="anthropic", anthropic_api_key="k")
+    assert out == "gốc"  # multi-line / clarifying answer rejected
+
+
+def test_overlong_output_falls_back_to_question(monkeypatch):
+    class _Messages:
+        def create(self, **kwargs):
+            return type("Resp", (), {"content": [type("B", (), {"text": "x" * 200})()]})()
+
+    class _Client:
+        def __init__(self, **kwargs):
+            self.messages = _Messages()
+
+    monkeypatch.setattr("anthropic.Anthropic", _Client)
+    assert reformulate_query("gốc", model="m", provider="anthropic", anthropic_api_key="k") == "gốc"
+
+
 def test_anthropic_failure_falls_back_to_question(monkeypatch):
     class _Boom:
         def __init__(self, **kwargs):

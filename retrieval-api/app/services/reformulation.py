@@ -38,7 +38,14 @@ def reformulate_query(
             system=SYSTEM_PROMPT,
             messages=messages,
         )
-        return response.content[0].text.strip()
+        rewritten = response.content[0].text.strip()
+        # The model sometimes answers conversationally ("Tôi cần thêm thông tin…")
+        # instead of returning a query. A real query is short and single-line;
+        # anything else pollutes retrieval, so fall back to the original question.
+        if not rewritten or len(rewritten) > 160 or "\n" in rewritten:
+            logger.info("reformulation output not query-like, using original question")
+            return question
+        return rewritten
     except Exception as e:  # any failure → don't block retrieval
         logger.warning("Reformulation failed, using original question: %s", e)
         return question

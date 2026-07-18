@@ -3,6 +3,9 @@ local/
 .claude/
 test_docs/
 
+# uploaded original files (blob storage, Slice 17) — user data, never committed
+data/
+
 # secrets  ← QUAN TRỌNG NHẤT
 .env
 .env.*

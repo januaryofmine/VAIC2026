@@ -28,9 +28,16 @@ def retrieve_endpoint(
         anthropic_api_key=settings.anthropic_api_key,
     )
     top_k = req.top_k or settings.retrieval_top_k
-    # With reranking on, pull a wider candidate set first, then re-score down to top_k.
-    fetch_k = max(top_k, settings.retrieval_candidates) if settings.reranker_enabled else top_k
-    rows = retrieve(conn, reformulated, str(req.document_id), fetch_k)
+    rows = retrieve(
+        conn,
+        reformulated,
+        str(req.document_id),
+        top_k,
+        over_fetch_multiplier=settings.over_fetch_multiplier,
+        rrf_k=settings.rrf_k,
+        min_chunk_chars=settings.min_chunk_chars,
+    )
+    # Optional 2nd-stage cross-encoder rerank over the fused candidates.
     if settings.reranker_enabled:
         rows = rerank(reformulated, rows, top_k, settings.reranker_model)
     logger.info(

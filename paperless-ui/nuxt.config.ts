@@ -15,7 +15,10 @@ export default defineNuxtConfig({
       summarizeMapModel: "claude-haiku-4-5-20251001", // cheap/fast for the map step
       summarizeReduceModel: "claude-sonnet-4-6", // quality for structured reduce
       chatModel: "claude-sonnet-4-6",
+      planModel: "claude-haiku-4-5-20251001", // cheap/fast: plan the Q&A search strategy
       temperature: 0.3,
+      askTopK: 6, // chunks retrieved per sub-query in the fan-out
+      askMaxChunks: 12, // cap on the merged chunk set fed to synthesis
       // map-reduce tuning for the <60s budget: fewer, larger groups + capped concurrency.
       // Concurrency 10 is safe (no per-call throttling observed); bigger groups = fewer waves.
       mapGroupChars: 30000,

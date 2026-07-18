@@ -7,7 +7,7 @@ import psycopg
 import pytest
 from pgvector.psycopg import register_vector
 
-from app.services.documents import fetch_full_document
+from app.services.documents import fetch_document_status, fetch_full_document
 
 pytestmark = pytest.mark.integration
 
@@ -54,6 +54,31 @@ def test_returns_chunks_ordered_by_position(conn):
 
 def test_missing_document_returns_none(conn):
     assert fetch_full_document(conn, str(uuid.uuid4())) is None
+
+
+def test_status_reports_state_and_chunk_count(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO documents (filename, doc_type, page_count, status) "
+            "VALUES ('s.pdf', 'pdf', 3, 'embedding') RETURNING id"
+        )
+        doc_id = cur.fetchone()[0]
+        cur.execute(
+            "INSERT INTO chunks (document_id, position, page, section, text, embedding) "
+            "VALUES (%s, 0, 1, 'Điều 1', 'x', %s)",
+            (doc_id, [0.0] * 1024),
+        )
+    conn.commit()
+    try:
+        st = fetch_document_status(conn, str(doc_id))
+        assert st["status"] == "embedding"
+        assert st["chunk_count"] == 1
+        assert st["page_count"] == 3
+        assert fetch_document_status(conn, str(uuid.uuid4())) is None
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
+        conn.commit()
 
 
 def test_document_with_no_chunks(conn):

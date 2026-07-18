@@ -19,18 +19,53 @@ def connect(database_url: str) -> psycopg.Connection:
     return conn
 
 
+def find_document_by_hash(conn: psycopg.Connection, content_hash: str) -> str | None:
+    """Return the id of a non-failed document with this content hash (dedup), else None.
+
+    Excludes 'failed' so a file that failed to ingest can be re-uploaded for a fresh
+    attempt instead of dedup-ing back to the broken row.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM documents "
+            "WHERE content_hash = %s AND status <> 'failed' ORDER BY uploaded_at LIMIT 1",
+            (content_hash,),
+        )
+        row = cur.fetchone()
+    return str(row[0]) if row else None
+
+
 def insert_document(
-    conn: psycopg.Connection, filename: str, doc_type: str, page_count: int | None
+    conn: psycopg.Connection,
+    filename: str,
+    doc_type: str,
+    page_count: int | None = None,
+    status: str = "pending",
+    content_hash: str | None = None,
+    storage_path: str | None = None,
+    size_bytes: int | None = None,
 ) -> str:
     with conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO documents (filename, doc_type, page_count, status) "
-            "VALUES (%s, %s, %s, 'embedding') RETURNING id",
-            (filename, doc_type, page_count),
+            "INSERT INTO documents "
+            "(filename, doc_type, page_count, status, content_hash, storage_path, size_bytes) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (filename, doc_type, page_count, status, content_hash, storage_path, size_bytes),
         )
         doc_id = cur.fetchone()[0]
     conn.commit()
     return str(doc_id)
+
+
+def update_page_count(
+    conn: psycopg.Connection, document_id: str, page_count: int | None
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE documents SET page_count = %s WHERE id = %s",
+            (page_count, document_id),
+        )
+    conn.commit()
 
 
 def insert_chunks(

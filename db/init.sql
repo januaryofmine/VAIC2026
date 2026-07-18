@@ -11,11 +11,22 @@ CREATE TABLE IF NOT EXISTS documents (
   doc_type TEXT NOT NULL,                    -- 'pdf' | 'docx'
   page_count INTEGER,                        -- page count (PDF); NULL until parsed
   status TEXT NOT NULL DEFAULT 'pending',    -- pending → parsing → embedding → ready | failed
+  storage_path TEXT,                         -- absolute path to the original file (blob); NULL until stored
+  size_bytes BIGINT,                         -- original file size
+  content_hash TEXT,                         -- SHA-256 of file bytes → dedup identical re-uploads
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT documents_doc_type_check CHECK (doc_type IN ('pdf', 'docx')),
   CONSTRAINT documents_status_check
     CHECK (status IN ('pending', 'parsing', 'embedding', 'ready', 'failed'))
 );
+
+-- Dedup: identical file re-uploaded → reuse the existing document instead of re-ingesting.
+-- UNIQUE (partial) so a concurrent double-upload can't create two rows for the same
+-- content; ingest catches the violation and reuses the winner. Excludes 'failed' so a
+-- file that failed once can be re-uploaded for a fresh attempt (and NULL hashes, of which
+-- there may be many from pre-Slice-17 docs).
+CREATE UNIQUE INDEX IF NOT EXISTS documents_content_hash_uniq
+  ON documents (content_hash) WHERE content_hash IS NOT NULL AND status <> 'failed';
 
 -- ── chunks ───────────────────────────────────────────────────
 -- Heart of citation. Scoped by document_id, carries page (PDF) + section (Điều/Khoản).
