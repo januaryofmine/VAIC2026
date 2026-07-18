@@ -21,13 +21,27 @@ Single monorepo.
 
 #### Updates
 
-- Per-user document scoping: `users` table + `documents.user_id`, GitHub-login gating, "Tài liệu của tôi" Home (navy + gold).
-- Persist the original file (blob storage) with content-hash dedup ([`ffa1712`](https://github.com/januaryofmine/VAIC2026/commit/ffa1712)).
-- GitHub OAuth login via `nuxt-auth-utils` ([`b351501`](https://github.com/januaryofmine/VAIC2026/commit/b351501)).
-- Plan-and-fan-out Q&A: multi-query, Ask-style retrieval ([`9ef4aaf`](https://github.com/januaryofmine/VAIC2026/commit/9ef4aaf)).
-- Token/structure-aware chunking (never splits across `Điều N`) ([`36e2116`](https://github.com/januaryofmine/VAIC2026/commit/36e2116)).
-- Async document ingestion with status polling ([`f880481`](https://github.com/januaryofmine/VAIC2026/commit/f880481)).
-- Hybrid retrieval: dense vector + Postgres full-text, fused with RRF + neighbor expansion.
+_Most recent first. Each line links the commit that introduced it._
+
+- **Shared test-account login** — one-click demo sign-in (no OAuth) via a fixed sentinel user (`github_id 0`) upserted `ON CONFLICT`, so everyone lands on the same owner and shares one document scope ([`73d9af0`](https://github.com/januaryofmine/VAIC2026/commit/73d9af0)).
+- **Two-pane document reader** — the original PDF rendered with `vue-pdf-embed` (PDF.js) next to a four-tab prep-pack (summary · terms · questions · Q&A); client-only Nuxt plugin with the pdf worker served as a hashed Vite `?url` asset (CSP-safe) ([`9e7bc63`](https://github.com/januaryofmine/VAIC2026/commit/9e7bc63)).
+- **Direct browser→backend upload** — the BFF mints a short-lived **HMAC-SHA256** token (`<userId>.<exp>.<hmac>`, constant-time verify, identical bytes in Node & Python) so large files upload straight to the API and skip Vercel's 4.5 MB function-body limit, while the API key stays server-side ([`7546d99`](https://github.com/januaryofmine/VAIC2026/commit/7546d99)).
+- **Persistent chat history** — `chat_sessions` + `chat_messages` (one session per doc via a partial unique index); the full turn is saved atomically on stream finish with `ON CONFLICT DO NOTHING` dedup, citations kept in JSONB ([`7e2b618`](https://github.com/januaryofmine/VAIC2026/commit/7e2b618)).
+- **Prep-pack cache** — summary/terms/questions cached in a `prep_packs` JSONB table, so reopening a document costs **0 LLM calls** (≈35s → 0.02s) ([`0046d19`](https://github.com/januaryofmine/VAIC2026/commit/0046d19)).
+- **Cloud ingest over HTTP** — browser → BFF → retrieval-api multipart proxy, guarded by an `X-API-Key` header, with early-return async ingest coordinated across services ([`a17e19e`](https://github.com/januaryofmine/VAIC2026/commit/a17e19e)).
+- **Per-user scoping + navy/gold design system** — `users` + `documents.user_id`, owner-scoped list, auth-gated "Tài liệu của tôi" Home; Nuxt UI custom `@theme` palette (navy `#1D2B4A` / gold `#C9A227`) with semantic tokens ([`901422e`](https://github.com/januaryofmine/VAIC2026/commit/901422e)).
+- **GitHub OAuth login** — `nuxt-auth-utils` sealed session cookie + idempotent user upsert into Postgres ([`b351501`](https://github.com/januaryofmine/VAIC2026/commit/b351501)).
+- **One-command cloud deploy** — Supabase schema loader with pooler auto-detect (session ↔ transaction fallback) + a single Hugging Face Space Docker image (retrieval-api + rag-pipeline, `multilingual-e5-large` pre-downloaded at build for a <1s first request); every `/api/*` route behind an API-key middleware guard ([`1a907f9`](https://github.com/januaryofmine/VAIC2026/commit/1a907f9)).
+- **Original-file blob storage** — SHA-256 content-hash keys with a **race-safe partial unique index** (`WHERE content_hash IS NOT NULL AND status <> 'failed'`): identical re-uploads dedup to one row, failed ones can retry; pluggable `BlobStorage` for a later S3 swap ([`ffa1712`](https://github.com/januaryofmine/VAIC2026/commit/ffa1712)).
+- **Plan-and-fan-out Q&A** — Claude Haiku decomposes a question into ≤5 self-contained sub-queries, each hits the hybrid retriever in parallel, results are **RRF-merged** and capped before synthesis (Ask-style; falls back to single-query) ([`9ef4aaf`](https://github.com/januaryofmine/VAIC2026/commit/9ef4aaf)).
+- **Token/structure-aware chunking** — the `transformers` tokenizer packs ~400-token chunks (under e5's 512 limit) with ~15% trailing overlap, and **never splits across a `Điều N` boundary** ([`36e2116`](https://github.com/januaryofmine/VAIC2026/commit/36e2116)).
+- **Async ingestion with status polling** — a background `spawn` emits `document_id` before the slow embed step; the client polls `pending → parsing → embedding → ready` every 2s ([`f880481`](https://github.com/januaryofmine/VAIC2026/commit/f880481)).
+- **Hybrid retrieval** — dense pgvector cosine + Postgres full-text (`tsvector` / prefix `tsquery`, Vietnamese stopword filter) over-fetched and fused with **Reciprocal Rank Fusion** (k=60), then ±1 **neighbor expansion** to recover context that spills across chunks ([`f9944d4`](https://github.com/januaryofmine/VAIC2026/commit/f9944d4)).
+- **Map-reduce prep-pack** — a shared `mapReduce<T>` engine powers summary/terms/questions over 40–60 pages in **<60s**: character-grouped batches, concurrency-capped parallel Claude calls, Zod-validated structured output ([`0f7e8b3`](https://github.com/januaryofmine/VAIC2026/commit/0f7e8b3), [`4eab81f`](https://github.com/januaryofmine/VAIC2026/commit/4eab81f)).
+- **Streaming grounded Q&A** — AI SDK v6 `streamText` + `createUIMessageStream`; citations (page / `Điều`) attached as `messageMetadata` and streamed live to `@ai-sdk/vue` ([`67ff2c6`](https://github.com/januaryofmine/VAIC2026/commit/67ff2c6), [`bf966e4`](https://github.com/januaryofmine/VAIC2026/commit/bf966e4)).
+- **Two retrieval paths** — plain-fetch full document (`ORDER BY position`, no embedding) for prep-pack, vs. vector search scoped by `document_id` for Q&A ([`f05dd16`](https://github.com/januaryofmine/VAIC2026/commit/f05dd16), [`1728c05`](https://github.com/januaryofmine/VAIC2026/commit/1728c05)).
+- **Multilingual embeddings + citation metadata** — `intfloat/multilingual-e5-large` (1024-dim, local torch) with `passage:` / `query:` prefixes and L2 normalization; every chunk carries `page` (PDF) and `section` (`Điều`/`Khoản`) so answers cite the source ([`fc789a2`](https://github.com/januaryofmine/VAIC2026/commit/fc789a2)).
+- **Foundation** — Postgres 17 + pgvector schema (`vector(1024)`, cosine): users · documents · chunks · chat ([`29597aa`](https://github.com/januaryofmine/VAIC2026/commit/29597aa)).
 
 ## Project Structure
 
