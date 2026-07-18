@@ -20,8 +20,10 @@ ENV HOME=/home/user \
 
 WORKDIR /home/user/app
 
-# CPU-only torch (no CUDA) — smaller and matches HF Spaces free (CPU).
-RUN pip install --no-cache-dir --user torch --index-url https://download.pytorch.org/whl/cpu
+# CUDA torch (default wheel bundles CUDA) so e5 + bge run on the GPU when the Space
+# is on GPU hardware (T4). sentence-transformers auto-selects cuda when available.
+# On CPU-basic hardware this still works (falls back to CPU), just larger.
+RUN pip install --no-cache-dir --user torch
 
 # Union of retrieval-api + rag-pipeline runtime deps. Pinned (fix L1: reproducible
 # builds) to the same lower bounds as the two pyproject.toml files.
@@ -44,6 +46,9 @@ ENV RAG_PIPELINE_DIR=/home/user/app/rag-pipeline
 
 # Pre-download the embedding model so the first request isn't a ~2GB cold start.
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('intfloat/multilingual-e5-large')"
+# Pre-download the reranker (bge ~2.3GB) too, so the first Q&A with reranking on
+# doesn't stall on a cold model download.
+RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('BAAI/bge-reranker-v2-m3')"
 
 WORKDIR /home/user/app/retrieval-api
 EXPOSE 7860
