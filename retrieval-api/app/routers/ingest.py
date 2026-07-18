@@ -23,9 +23,10 @@ import tempfile
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
 
 from app.config import get_settings
+from app.services.upload_token import verify_upload_token
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -55,10 +56,29 @@ def _load_rag():
 def ingest_endpoint(
     file: UploadFile = File(...),
     user_id: str | None = Form(default=None),
+    x_upload_token: str | None = Header(default=None, alias="X-Upload-Token"),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ) -> dict:
     settings = get_settings()
     if not settings.database_url:
         raise HTTPException(status_code=500, detail="DATABASE_URL not configured")
+
+    # Auth (this route is exempt from the global api-key middleware so the browser can
+    # upload directly). Two ways in:
+    #   • X-Upload-Token — HMAC signed by the BFF; the owner is taken FROM the token
+    #     (browser can't forge it), so a browser never needs the API_KEY.
+    #   • X-API-Key — trusted server-to-server; the owner comes from the form field.
+    # Empty api_key (local dev) leaves the endpoint open.
+    if x_upload_token:
+        owner = verify_upload_token(x_upload_token, settings.api_key)
+        if not owner:
+            raise HTTPException(status_code=401, detail="invalid or expired upload token")
+    elif settings.api_key:
+        if x_api_key != settings.api_key:
+            raise HTTPException(status_code=401, detail="invalid or missing API key")
+        owner = user_id
+    else:
+        owner = user_id  # local dev (no api_key set)
 
     name = Path(file.filename or "upload").name
     suffix = Path(name).suffix.lower()
@@ -101,7 +121,7 @@ def ingest_endpoint(
             try:
                 rag_ingest(
                     str(tmp_path), conn, _embedder,
-                    user_id=user_id, on_created=_on_created,
+                    user_id=owner, on_created=_on_created,
                 )
             finally:
                 conn.close()

@@ -27,17 +27,24 @@ async function submit() {
   uploading.value = true;
   error.value = "";
   try {
+    // Direct-to-backend upload: get a signed ticket, then POST the file straight to
+    // retrieval-api (bypasses Vercel's 4.5MB function-body limit for large PDFs).
+    const ticket = await $fetch<{ url: string; token: string }>("/api/upload-ticket", {
+      method: "POST",
+    });
     const form = new FormData();
     form.append("file", file.value);
-    const res = await $fetch<{ document_id: string }>("/api/upload", {
+    const res = await $fetch<{ document_id: string }>(ticket.url, {
       method: "POST",
       body: form,
+      headers: { "X-Upload-Token": ticket.token },
     });
     emit("uploaded", res.document_id);
     open.value = false;
   } catch (e: unknown) {
-    const err = e as { data?: { statusMessage?: string; message?: string } };
-    error.value = err?.data?.statusMessage || err?.data?.message || "Tải lên thất bại";
+    const err = e as { data?: { statusMessage?: string; message?: string; detail?: string } };
+    error.value =
+      err?.data?.detail || err?.data?.statusMessage || err?.data?.message || "Tải lên thất bại";
   } finally {
     uploading.value = false;
   }
