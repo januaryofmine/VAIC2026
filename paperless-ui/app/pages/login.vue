@@ -47,7 +47,7 @@ const hasError = computed(() => route.query.error === "github_oauth_error");
             block
           />
           <p class="text-center text-xs text-[var(--ui-text-muted)]">
-            Tài khoản dùng chung để thử nhanh — mọi người thấy chung tài liệu.
+            Tài khoản dùng chung để sử dụng nhanh. Mọi người sẽ thấy chung tài liệu.
           </p>
         </div>
         <UAlert
