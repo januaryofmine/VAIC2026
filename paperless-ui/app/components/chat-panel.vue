@@ -40,7 +40,7 @@ function sourcesOf(m: UIMessage): Source[] {
 
     <div class="space-y-3">
       <p v-if="messages.length === 0" class="text-sm text-[var(--ui-text-muted)]">
-        Đặt câu hỏi về tài liệu bằng tiếng Việt — câu trả lời sẽ kèm trích dẫn trang/Điều.
+        Đặt câu hỏi về tài liệu.
       </p>
 
       <div v-for="(m, i) in messages" :key="m.id ?? i" data-testid="chat-message">

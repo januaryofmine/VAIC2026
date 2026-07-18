@@ -1,11 +1,12 @@
 export default defineEventHandler(async (event) => {
-  const doc = await loadDocumentForPrepPack(event);
   const { ai } = useRuntimeConfig();
-  const summary = await summarizeDocument(
-    doc.chunks,
-    createAnthropicSummarizer(),
-    ai.mapGroupChars,
-    ai.mapConcurrency,
+  // Cache-or-compute: returns the stored summary on a re-open, else map-reduces once.
+  return await cachedPrepPack(event, "summary", (doc) =>
+    summarizeDocument(
+      doc.chunks,
+      createAnthropicSummarizer(),
+      ai.mapGroupChars,
+      ai.mapConcurrency,
+    ),
   );
-  return { document_id: doc.document_id, filename: doc.filename, summary };
 });

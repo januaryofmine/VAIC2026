@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -59,6 +60,19 @@ class DocumentListItem(BaseModel):
 
 class DocumentListResponse(BaseModel):
     documents: list[DocumentListItem]
+
+
+class PrepPackResponse(BaseModel):
+    document_id: str
+    filename: str
+    summary: Any | None = None    # cached LLM output; None until computed
+    terms: Any | None = None
+    questions: Any | None = None
+
+
+class PrepPackUpsertRequest(BaseModel):
+    kind: str  # "summary" | "terms" | "questions" (validated in the service)
+    value: Any
 
 
 class RetrieveRequest(BaseModel):
