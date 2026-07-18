@@ -33,6 +33,21 @@ _STATUS_SQL = """
 """
 
 
+_FILE_SQL = """
+    SELECT filename, doc_type, storage_path
+    FROM documents
+    WHERE id = %(id)s::uuid
+"""
+
+
+def fetch_document_file(conn: psycopg.Connection, document_id: str) -> dict | None:
+    """Return {filename, doc_type, storage_path} for serving the original blob, or None."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(_FILE_SQL, {"id": document_id})
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
 def fetch_document_status(conn: psycopg.Connection, document_id: str) -> dict | None:
     """Lightweight status for polling during async ingestion (no chunk text)."""
     with conn.cursor(row_factory=dict_row) as cur:

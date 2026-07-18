@@ -81,5 +81,39 @@ def test_status_404(monkeypatch):
     assert _client().get(f"/api/documents/{_DOC_ID}/status").status_code == 404
 
 
+def test_get_file_ok(monkeypatch, tmp_path):
+    blob = tmp_path / "orig.pdf"
+    blob.write_bytes(b"%PDF-1.4 original bytes")
+    monkeypatch.setattr(
+        documents_router,
+        "fetch_document_file",
+        lambda conn, doc_id: {
+            "filename": "Nghị quyết.pdf",
+            "doc_type": "pdf",
+            "storage_path": str(blob),
+        },
+    )
+    r = _client().get(f"/api/documents/{_DOC_ID}/file")
+    assert r.status_code == 200
+    assert r.content == b"%PDF-1.4 original bytes"
+    assert r.headers["content-type"] == "application/pdf"
+    assert "inline" in r.headers.get("content-disposition", "")
+
+
+def test_get_file_404_when_document_missing(monkeypatch):
+    monkeypatch.setattr(documents_router, "fetch_document_file", lambda conn, doc_id: None)
+    assert _client().get(f"/api/documents/{_DOC_ID}/file").status_code == 404
+
+
+def test_get_file_404_when_blob_not_stored(monkeypatch):
+    # Row exists but storage_path is null (e.g. a doc ingested before Slice 17).
+    monkeypatch.setattr(
+        documents_router,
+        "fetch_document_file",
+        lambda conn, doc_id: {"filename": "x.pdf", "doc_type": "pdf", "storage_path": None},
+    )
+    assert _client().get(f"/api/documents/{_DOC_ID}/file").status_code == 404
+
+
 def test_healthz():
     assert _client().get("/api/healthz").json() == {"status": "ok"}

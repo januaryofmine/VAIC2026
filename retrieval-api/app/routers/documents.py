@@ -1,15 +1,27 @@
 import logging
+import os
 from uuid import UUID
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 
 from app.deps import get_db
 from app.models import DocumentChunk, DocumentStatusResponse, FullDocumentResponse
-from app.services.documents import fetch_document_status, fetch_full_document
+from app.services.documents import (
+    fetch_document_file,
+    fetch_document_status,
+    fetch_full_document,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Original-file MIME types so the browser can render the blob inline (PDF viewer).
+_MEDIA_TYPES = {
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
 
 @router.get("/documents/{document_id}/full", response_model=FullDocumentResponse)
@@ -41,6 +53,28 @@ def get_document_status(
     if row is None:
         raise HTTPException(status_code=404, detail="document not found")
     return DocumentStatusResponse(**row)
+
+
+@router.get("/documents/{document_id}/file")
+def get_document_file(
+    document_id: UUID,
+    conn: psycopg.Connection = Depends(get_db),
+) -> FileResponse:
+    row = fetch_document_file(conn, str(document_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    path = row["storage_path"]
+    if not path or not os.path.isfile(path):
+        # Row exists but the original blob was never stored (older doc) or is missing.
+        raise HTTPException(status_code=404, detail="original file not available")
+    media_type = _MEDIA_TYPES.get(row["doc_type"], "application/octet-stream")
+    # inline so a PDF opens in the browser viewer instead of downloading.
+    return FileResponse(
+        path,
+        media_type=media_type,
+        filename=row["filename"],
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/healthz")
