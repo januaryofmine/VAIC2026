@@ -35,3 +35,6 @@ uploads/
 
 # os
 .DS_Store
+
+# deploy secrets (Supabase pw, tokens, DATABASE_URL cloud) — never commit
+deploy/.secrets

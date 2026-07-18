@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers.documents import router as documents_router
+from app.routers.ingest import router as ingest_router
 from app.routers.retrieve import router as retrieve_router
 
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +24,21 @@ app.add_middleware(
 
 app.include_router(documents_router, prefix="/api")
 app.include_router(retrieve_router, prefix="/api")
+app.include_router(ingest_router, prefix="/api")
+
+
+@app.middleware("http")
+async def api_key_guard(request: Request, call_next):
+    """S1: when api_key is set, gate every /api route except the healthcheck.
+    Empty api_key (local dev) leaves everything open."""
+    key = settings.api_key
+    path = request.url.path
+    if key and path.startswith("/api") and path != "/api/healthz":
+        if request.headers.get("x-api-key") != key:
+            return JSONResponse(
+                status_code=401, content={"detail": "invalid or missing API key"}
+            )
+    return await call_next(request)
 
 
 @app.exception_handler(Exception)
