@@ -4,6 +4,8 @@
 
 AI for document processing & meeting preparation, built for the **VAIC 2026**.
 
+_Turn a 60-page legal document into a meeting brief in under a minute._
+
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-000000?logo=vercel&logoColor=white)](https://paperless-ui-five.vercel.app)
 [![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97_Hugging_Face-Space-FFD21E?logoColor=black)](https://KintsugiXOR-vaic-retrieval.hf.space)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white)
