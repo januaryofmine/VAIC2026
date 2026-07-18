@@ -8,7 +8,7 @@ import type {
   RetrieveResponse,
 } from "../types/retrieval";
 import type { HistoryEntry } from "./chat-context";
-import { apiKeyHeaders } from "./retrieval-http";
+import { apiKeyHeaders, traceHeaders } from "./retrieval-http";
 
 /** Read the cached prep-pack (summary/terms/questions) for a document (Slice 14a). */
 export async function getPrepPack(documentId: string): Promise<PrepPackCache> {
@@ -97,11 +97,13 @@ export async function retrieveChunks(
   documentId: string,
   history: HistoryEntry[],
   topK?: number,
+  /** Tuỳ chọn: id để nối span RAG vào cùng trace với các lời gọi LLM (AI monitoring). */
+  traceId?: string,
 ): Promise<RetrieveResponse> {
   const config = useRuntimeConfig();
   return await $fetch<RetrieveResponse>(`${config.retrievalApiHost}/api/retrieve`, {
     method: "POST",
     body: { question, document_id: documentId, history, top_k: topK },
-    headers: apiKeyHeaders(config.retrievalApiKey),
+    headers: { ...apiKeyHeaders(config.retrievalApiKey), ...traceHeaders(traceId) },
   });
 }

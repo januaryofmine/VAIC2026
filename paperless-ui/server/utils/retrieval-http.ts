@@ -8,6 +8,16 @@ export function apiKeyHeaders(apiKey: string | undefined): Record<string, string
   return apiKey ? { "X-API-Key": apiKey } : {};
 }
 
+/**
+ * Trace-correlation header. Truyền cùng một id cho lời gọi retrieval-api và các
+ * lời gọi LLM của cùng một câu hỏi → trong Langfuse hiện thành MỘT trace
+ * (UI → RAG → LLM) thay vì các mảnh rời, nên truy nguyên được vì sao một câu
+ * trả lời trích dẫn sai. Không có id → không gửi header (retrieval-api tự sinh).
+ */
+export function traceHeaders(traceId: string | undefined): Record<string, string> {
+  return traceId ? { "X-Trace-Id": traceId } : {};
+}
+
 /** Multipart body for `POST /api/ingest`: the file under its original name, plus
  * the owning user id (Slice 18 scoping) when signed in. */
 export function buildIngestForm(
