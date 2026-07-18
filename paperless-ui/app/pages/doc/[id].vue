@@ -4,6 +4,9 @@ const documentId = route.params.id as string;
 
 const { info, error, status, ready, failed } = useDocStatus(documentId);
 
+// Shared channel so a citation chip (right pane) can drive the PDF viewer (left pane).
+provideDocJump();
+
 const statusLabel = computed(
   () =>
     ({

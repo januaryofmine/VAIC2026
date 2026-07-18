@@ -2,6 +2,8 @@ export interface Source {
   position?: number;
   page: number | null;
   section: string | null;
+  /** The cited chunk's text — used to fuzzy-highlight it in the PDF (Slice 15c). */
+  text?: string;
 }
 
 /** Human label for a citation chip, e.g. "trang 3, Điều 1" or "Điều 5". */
