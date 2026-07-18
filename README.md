@@ -4,6 +4,14 @@
 
 AI for document processing & meeting preparation, built for the **VAIC 2026**.
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Vercel-000000?logo=vercel&logoColor=white)](https://paperless-ui-five.vercel.app)
+[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97_Hugging_Face-Space-FFD21E?logoColor=black)](https://KintsugiXOR-vaic-retrieval.hf.space)
+![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white)
+![Nuxt 4](https://img.shields.io/badge/Nuxt-4-00DC82?logo=nuxtdotjs&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-4169E1?logo=postgresql&logoColor=white)
+![VAIC 2026](https://img.shields.io/badge/VAIC-2026-C9A227)
+
 ![Paperless](./docs/paperless-screenshot.png)
 
 </div>
