@@ -48,6 +48,42 @@ def fetch_document_file(conn: psycopg.Connection, document_id: str) -> dict | No
         return dict(row) if row else None
 
 
+# List "my documents" (Home, Slice 18): owner-scoped, newest first, optional filters.
+# to_char gives a stable ISO timestamp the BFF can format for display.
+_LIST_SQL = """
+    SELECT
+        d.id::text AS document_id, d.filename, d.doc_type, d.status, d.page_count,
+        (SELECT count(*) FROM chunks c WHERE c.document_id = d.id) AS chunk_count,
+        d.size_bytes,
+        to_char(d.uploaded_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS uploaded_at
+    FROM documents d
+    WHERE d.user_id = %(user_id)s::uuid
+      AND (%(doc_type)s::text IS NULL OR d.doc_type = %(doc_type)s::text)
+      AND (%(date_from)s::date IS NULL OR d.uploaded_at >= %(date_from)s::date)
+      AND (%(date_to)s::date IS NULL OR d.uploaded_at < (%(date_to)s::date + 1))
+      AND (%(q)s::text IS NULL OR d.filename ILIKE '%%' || %(q)s::text || '%%')
+    ORDER BY d.uploaded_at DESC
+"""
+
+
+def list_documents(
+    conn: psycopg.Connection,
+    user_id: str,
+    doc_type: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    q: str | None = None,
+) -> list[dict]:
+    """All documents owned by a user, newest first, with optional type/date/keyword filters."""
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            _LIST_SQL,
+            {"user_id": user_id, "doc_type": doc_type, "date_from": date_from,
+             "date_to": date_to, "q": q},
+        )
+        return [dict(row) for row in cur.fetchall()]
+
+
 def fetch_document_status(conn: psycopg.Connection, document_id: str) -> dict | None:
     """Lightweight status for polling during async ingestion (no chunk text)."""
     with conn.cursor(row_factory=dict_row) as cur:

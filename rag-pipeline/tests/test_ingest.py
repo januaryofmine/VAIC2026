@@ -116,27 +116,36 @@ def test_ingest_survives_dedup_race(conn, monkeypatch, tmp_path):
     f.write_bytes(content)
     chash = sha256_file(f)
 
-    # Pre-insert the "winner" row with this hash (the concurrent upload that won).
-    winner = db.insert_document(conn, "winner.pdf", "pdf", status="pending", content_hash=chash)
+    # Owner needed: the unique index is on (user_id, content_hash) and NULLs are distinct,
+    # so the race only collides for a real owner.
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO users (github_id, username) VALUES (999200001,'race') RETURNING id")
+        uid = str(cur.fetchone()[0])
+    conn.commit()
+
+    # Pre-insert the "winner" row with this (owner, hash) (the concurrent upload that won).
+    winner = db.insert_document(conn, "winner.pdf", "pdf", status="pending", content_hash=chash, user_id=uid)
 
     # Dedup pre-check MISSES (returns None) so we reach the insert → unique violation;
     # the recovery re-query then finds the winner.
     calls = {"n": 0}
 
-    def flaky_find(c, h):
+    def flaky_find(c, h, u=None):
         calls["n"] += 1
         return None if calls["n"] == 1 else winner  # miss on pre-check, hit on recovery
 
     monkeypatch.setattr(db, "find_document_by_hash", flaky_find)
 
-    got = ingest.ingest(str(f), conn, FakeEmbedder(), storage=storage)
+    got = ingest.ingest(str(f), conn, FakeEmbedder(), storage=storage, user_id=uid)
     try:
         assert got == winner  # recovered to the racing winner instead of erroring
         with conn.cursor() as cur:
             cur.execute("SELECT count(*) FROM documents WHERE content_hash = %s", (chash,))
             assert cur.fetchone()[0] == 1  # unique index kept it to one row
     finally:
-        _delete(conn, winner)
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM users WHERE github_id = 999200001")  # cascades the doc
+        conn.commit()
 
 
 def test_failed_doc_is_not_deduped_can_retry(conn, monkeypatch, tmp_path):
@@ -168,6 +177,38 @@ def test_failed_doc_is_not_deduped_can_retry(conn, monkeypatch, tmp_path):
     finally:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM documents WHERE content_hash = %s", (chash,))
+        conn.commit()
+
+
+def test_ingest_scopes_dedup_per_user(conn, monkeypatch, tmp_path):
+    # Same file, two different owners → two separate documents (dedup is per-user).
+    blocks = (Block("Điều 1. " + "nội dung. " * 20, page=1, section="Điều 1"),)
+    monkeypatch.setattr(ingest, "parse", lambda _p: ParsedDoc(blocks=blocks, page_count=1))
+    storage = BlobStorage(tmp_path / "store")
+    content = b"%PDF-1.4 peruser " + str(tmp_path).encode()
+    f = tmp_path / "shared.pdf"
+    f.write_bytes(content)
+
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO users (github_id, username) VALUES (999100001,'ua'),(999100002,'ub') RETURNING id")
+        # fetch both ids
+        cur.execute("SELECT id FROM users WHERE github_id IN (999100001,999100002) ORDER BY github_id")
+        ua, ub = [r[0] for r in cur.fetchall()]
+    conn.commit()
+
+    try:
+        id_a = ingest.ingest(str(f), conn, FakeEmbedder(), storage=storage, user_id=str(ua))
+        id_b = ingest.ingest(str(f), conn, FakeEmbedder(), storage=storage, user_id=str(ub))
+        assert id_a != id_b  # different owners → not deduped together
+        # ua re-uploads → dedups back to their own doc
+        id_a2 = ingest.ingest(str(f), conn, FakeEmbedder(), storage=storage, user_id=str(ua))
+        assert id_a2 == id_a
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id FROM documents WHERE id = %s", (id_a,))
+            assert str(cur.fetchone()[0]) == str(ua)
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM users WHERE github_id IN (999100001, 999100002)")
         conn.commit()
 
 

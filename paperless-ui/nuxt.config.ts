@@ -4,7 +4,10 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   // Fixed port so the GitHub OAuth callback (…:3100/api/auth/github) always matches.
   devServer: { port: 3100 },
-  modules: ["@nuxt/ui", "nuxt-auth-utils"],
+  modules: ["@nuxt/ui", "@nuxt/fonts", "nuxt-auth-utils"],
+  // The design is light-only; don't follow OS dark mode. A fresh storageKey ignores
+  // any stale 'dark' a browser stored before this was set (else it would override).
+  colorMode: { preference: "light", fallback: "light", storageKey: "pl-color-mode" },
   css: ["~/assets/css/main.css"],
   app: {
     head: { title: "Paperless Meetings" },

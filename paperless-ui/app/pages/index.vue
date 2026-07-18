@@ -1,90 +1,98 @@
 <script setup lang="ts">
-const fileInput = ref<HTMLInputElement | null>(null);
-const file = ref<File | null>(null);
-const uploading = ref(false);
-const error = ref("");
+const { documents, loading, filters, apply, refresh } = useDocuments();
+const uploadOpen = ref(false);
 
-const selectedName = computed(() => file.value?.name ?? "");
+const typeOptions = [
+  { label: "Tất cả", value: "all" }, // Reka UI forbids empty-string SelectItem values
+  { label: "PDF", value: "pdf" },
+  { label: "Word (.docx)", value: "docx" },
+];
 
-function pick() {
-  fileInput.value?.click();
-}
-
-function onChange(e: Event) {
-  const picked = (e.target as HTMLInputElement).files?.[0] ?? null;
-  error.value = "";
-  if (picked && !isSupportedDoc(picked.name)) {
-    error.value = "Chỉ hỗ trợ file PDF hoặc Word (.docx)";
-    file.value = null;
-    return;
-  }
-  file.value = picked;
-}
-
-async function submit() {
-  if (!file.value) return;
-  uploading.value = true;
-  error.value = "";
-  try {
-    const form = new FormData();
-    form.append("file", file.value);
-    const res = await $fetch<{ document_id: string }>("/api/upload", {
-      method: "POST",
-      body: form,
-    });
-    await navigateTo(`/doc/${res.document_id}`);
-  } catch (e: unknown) {
-    const err = e as { data?: { statusMessage?: string; message?: string } };
-    error.value = err?.data?.statusMessage || err?.data?.message || "Tải lên thất bại";
-  } finally {
-    uploading.value = false;
-  }
+function onUploaded(documentId: string) {
+  refresh();
+  navigateTo(`/doc/${documentId}`);
 }
 </script>
 
 <template>
-  <UCard>
-    <template #header>
-      <h1 class="text-lg font-semibold">Tải tài liệu họp</h1>
-      <p class="text-sm text-[var(--ui-text-muted)]">
-        PDF hoặc Word (.docx) — AI sẽ tóm tắt, giải thích thuật ngữ và gợi ý câu hỏi.
-      </p>
-    </template>
-
-    <div class="space-y-4">
-      <input
-        ref="fileInput"
-        type="file"
-        accept=".pdf,.docx"
-        class="hidden"
-        @change="onChange"
-      >
-      <div class="flex items-center gap-3">
-        <UButton icon="i-lucide-upload" variant="soft" @click="pick">Chọn file</UButton>
-        <span class="text-sm text-[var(--ui-text-muted)]" data-testid="selected-name">
-          {{ selectedName || "Chưa chọn file" }}
-        </span>
+  <div class="space-y-5">
+    <!-- Page head -->
+    <div class="flex flex-wrap items-end gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">Tài liệu của tôi</h1>
+        <p class="mt-1 text-sm text-[var(--pl-text-2)]">
+          Tải lên tài liệu để hệ thống phân tích, hoặc mở lại tài liệu đã chuẩn bị.
+        </p>
       </div>
-      <UAlert
-        v-if="error"
-        color="error"
-        variant="soft"
-        icon="i-lucide-triangle-alert"
-        :title="error"
-        data-testid="upload-error"
-      />
+      <div class="flex-1" />
+      <UButton
+        color="secondary"
+        icon="i-lucide-plus"
+        size="lg"
+        data-testid="open-upload"
+        @click="uploadOpen = true"
+      >
+        Tải tài liệu
+      </UButton>
     </div>
 
-    <template #footer>
-      <UButton
-        :loading="uploading"
-        :disabled="!file || uploading"
-        icon="i-lucide-sparkles"
-        data-testid="upload-submit"
-        @click="submit"
-      >
-        {{ uploading ? "Đang phân tích..." : "Tải lên & phân tích" }}
-      </UButton>
-    </template>
-  </UCard>
+    <!-- Filter bar -->
+    <div class="filterbar">
+      <div class="field grow">
+        <label>Từ khoá</label>
+        <UInput
+          v-model="filters.q"
+          placeholder="Tìm theo tên tài liệu…"
+          icon="i-lucide-search"
+          @keydown.enter="apply"
+        />
+      </div>
+      <div class="field">
+        <label>Loại</label>
+        <USelect v-model="filters.type" :items="typeOptions" class="w-40" />
+      </div>
+      <div class="field">
+        <label>Ngày tải lên</label>
+        <div class="flex items-center gap-2">
+          <UInput v-model="filters.date_from" type="date" />
+          <span class="text-[var(--pl-text-3)]">–</span>
+          <UInput v-model="filters.date_to" type="date" />
+        </div>
+      </div>
+      <UButton color="secondary" icon="i-lucide-filter" @click="apply">Lọc</UButton>
+    </div>
+
+    <!-- Result count + table (data is client-fetched → render client-only) -->
+    <ClientOnly>
+      <p class="text-sm text-[var(--pl-text-2)]">
+        <b class="text-[var(--pl-text)]">{{ documents.length }}</b> tài liệu
+      </p>
+      <DocumentsTable class="mt-3" :documents="documents" :loading="loading" />
+      <template #fallback>
+        <DocumentsTable :documents="[]" :loading="true" />
+      </template>
+    </ClientOnly>
+
+    <UploadModal v-model:open="uploadOpen" @uploaded="onUploaded" />
+  </div>
 </template>
+
+<style scoped>
+.filterbar {
+  background: #fff;
+  border: 1px solid var(--pl-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(19, 30, 53, 0.04), 0 4px 14px rgba(19, 30, 53, 0.06);
+  padding: 14px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field.grow { flex: 1; min-width: 200px; }
+.field label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase; color: var(--pl-text-3);
+}
+</style>

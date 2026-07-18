@@ -7,11 +7,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from app.deps import get_db
-from app.models import DocumentChunk, DocumentStatusResponse, FullDocumentResponse
+from app.models import (
+    DocumentChunk,
+    DocumentListItem,
+    DocumentListResponse,
+    DocumentStatusResponse,
+    FullDocumentResponse,
+)
 from app.services.documents import (
     fetch_document_file,
     fetch_document_status,
     fetch_full_document,
+    list_documents,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,6 +29,19 @@ _MEDIA_TYPES = {
     "pdf": "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
+
+
+@router.get("/documents", response_model=DocumentListResponse)
+def get_documents(
+    user_id: UUID,  # required query param — owner scope
+    type: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    q: str | None = None,
+    conn: psycopg.Connection = Depends(get_db),
+) -> DocumentListResponse:
+    rows = list_documents(conn, str(user_id), type, date_from, date_to, q)
+    return DocumentListResponse(documents=[DocumentListItem(**r) for r in rows])
 
 
 @router.get("/documents/{document_id}/full", response_model=FullDocumentResponse)

@@ -115,5 +115,30 @@ def test_get_file_404_when_blob_not_stored(monkeypatch):
     assert _client().get(f"/api/documents/{_DOC_ID}/file").status_code == 404
 
 
+_USER_ID = "22222222-2222-2222-2222-222222222222"
+
+
+def test_list_documents_ok(monkeypatch):
+    monkeypatch.setattr(
+        documents_router,
+        "list_documents",
+        lambda conn, user_id, *a, **k: [
+            {
+                "document_id": _DOC_ID, "filename": "x.pdf", "doc_type": "pdf",
+                "status": "ready", "page_count": 3, "chunk_count": 10,
+                "size_bytes": 1234, "uploaded_at": "2026-07-18T09:24:00+07",
+            }
+        ],
+    )
+    r = _client().get(f"/api/documents?user_id={_USER_ID}")
+    assert r.status_code == 200
+    docs = r.json()["documents"]
+    assert len(docs) == 1 and docs[0]["filename"] == "x.pdf" and docs[0]["chunk_count"] == 10
+
+
+def test_list_documents_requires_user_id():
+    assert _client().get("/api/documents").status_code == 422
+
+
 def test_healthz():
     assert _client().get("/api/healthz").json() == {"status": "ok"}

@@ -3,6 +3,10 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 export default defineEventHandler(async (event) => {
+  // Uploads are owned by the logged-in user (Slice 18); 401 if not signed in.
+  const { user } = await requireUserSession(event);
+  if (!user.id) throw createError({ statusCode: 401, statusMessage: "session expired" });
+
   const form = await readMultipartFormData(event);
   const filePart = form?.find((p) => p.name === "file" && p.filename);
   if (!filePart || !filePart.filename) {
@@ -37,9 +41,13 @@ export default defineEventHandler(async (event) => {
   try {
     // Resolves as soon as the document row exists (id emitted early); ingestion
     // continues in the background and updates documents.status. Cleanup on exit.
-    const documentId = await startIngestion(tmpPath, ragPipelineDir, () => {
-      void rm(dir, { recursive: true, force: true });
-    });
+    const documentId = await startIngestion(
+      tmpPath,
+      ragPipelineDir,
+      () => void rm(dir, { recursive: true, force: true }),
+      60_000,
+      user.id,
+    );
     return { document_id: documentId, filename: safeName, doc_type: docType, status: "processing" };
   } catch (e) {
     void rm(dir, { recursive: true, force: true });

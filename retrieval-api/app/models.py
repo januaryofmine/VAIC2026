@@ -31,6 +31,36 @@ class DocumentStatusResponse(BaseModel):
     chunk_count: int
 
 
+class UserUpsertRequest(BaseModel):
+    github_id: int
+    username: str
+    name: str | None = None
+    avatar_url: str | None = None
+
+
+class UserResponse(BaseModel):
+    id: str
+    github_id: int
+    username: str
+    name: str | None
+    avatar_url: str | None
+
+
+class DocumentListItem(BaseModel):
+    document_id: str
+    filename: str
+    doc_type: str
+    status: str
+    page_count: int | None
+    chunk_count: int
+    size_bytes: int | None
+    uploaded_at: str  # ISO 8601
+
+
+class DocumentListResponse(BaseModel):
+    documents: list[DocumentListItem]
+
+
 class RetrieveRequest(BaseModel):
     question: str
     document_id: UUID  # Q&A is always scoped to one document
