@@ -75,6 +75,24 @@ class PrepPackUpsertRequest(BaseModel):
     value: Any
 
 
+class ChatMessage(BaseModel):
+    id: str
+    role: str  # "user" | "assistant"
+    parts: Any  # AI-SDK UIMessage parts
+    metadata: Any | None = None  # citations/plan for assistant messages
+
+
+class ChatMessagesResponse(BaseModel):
+    messages: list[ChatMessage]
+
+
+class ChatMessageAppendRequest(BaseModel):
+    id: str
+    role: str
+    parts: Any
+    metadata: Any | None = None
+
+
 class RetrieveRequest(BaseModel):
     question: str
     document_id: UUID  # Q&A is always scoped to one document

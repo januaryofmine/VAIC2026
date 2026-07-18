@@ -1,5 +1,6 @@
 import type {
   AppUser,
+  ChatMessage,
   DocumentListResponse,
   FullDocument,
   PrepPackKind,
@@ -27,6 +28,28 @@ export async function savePrepPack(
   await $fetch(`${config.retrievalApiHost}/api/documents/${documentId}/prep-pack`, {
     method: "PUT",
     body: { kind, value },
+  });
+}
+
+/** Load a document's saved chat messages, in order (Slice 14b). */
+export async function getChatMessages(documentId: string): Promise<{ messages: ChatMessage[] }> {
+  const config = useRuntimeConfig();
+  return await $fetch<{ messages: ChatMessage[] }>(
+    `${config.retrievalApiHost}/api/documents/${documentId}/chat/messages`,
+    { headers: apiKeyHeaders(config.retrievalApiKey) },
+  );
+}
+
+/** Append one chat message (dedup by id) so the conversation survives a refresh. */
+export async function appendChatMessage(
+  documentId: string,
+  message: ChatMessage,
+): Promise<void> {
+  const config = useRuntimeConfig();
+  await $fetch(`${config.retrievalApiHost}/api/documents/${documentId}/chat/messages`, {
+    method: "POST",
+    body: message,
+    headers: apiKeyHeaders(config.retrievalApiKey),
   });
 }
 

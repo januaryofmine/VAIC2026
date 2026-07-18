@@ -6,8 +6,9 @@ import { DefaultChatTransport } from "ai";
 export function useDocChat(documentId: string) {
   const chat = shallowRef<Chat<UIMessage> | null>(null);
 
-  if (import.meta.client) {
-    chat.value = new Chat<UIMessage>({
+  const makeChat = (initial: UIMessage[]) =>
+    new Chat<UIMessage>({
+      messages: initial,
       transport: new DefaultChatTransport({
         api: "/api/chat",
         body: { document_id: documentId },
@@ -16,6 +17,15 @@ export function useDocChat(documentId: string) {
         console.error("[chat] error:", error);
       },
     });
+
+  if (import.meta.client) {
+    // Render immediately, then hydrate with any saved history (Slice 14b).
+    chat.value = makeChat([]);
+    $fetch<{ messages: UIMessage[] }>(`/api/documents/${documentId}/chat/messages`)
+      .then((res) => {
+        if (res.messages?.length) chat.value = makeChat(res.messages);
+      })
+      .catch((e) => console.error("[chat] load history failed:", e));
   }
 
   const messages = computed(() => chat.value?.messages ?? []);
