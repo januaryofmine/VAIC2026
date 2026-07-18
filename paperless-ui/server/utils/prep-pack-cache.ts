@@ -40,6 +40,8 @@ export async function cachedPrepPack<T>(
   if (!document_id) {
     throw createError({ statusCode: 400, statusMessage: "document_id is required" });
   }
+  // Authorize: caller must be signed in AND own this document (prep-pack runs Claude → cost).
+  await requireDocumentAccess(event, document_id);
   const { document_id: id, filename, value } = await resolvePrepPack<T>(document_id, kind, {
     getCache: getPrepPack,
     loadDoc: async (docId) => {

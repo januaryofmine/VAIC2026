@@ -7,7 +7,11 @@ import psycopg
 import pytest
 from pgvector.psycopg import register_vector
 
-from app.services.documents import fetch_document_status, fetch_full_document
+from app.services.documents import (
+    fetch_document_owner,
+    fetch_document_status,
+    fetch_full_document,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -97,3 +101,50 @@ def test_document_with_no_chunks(conn):
         with conn.cursor() as cur:
             cur.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
         conn.commit()
+
+
+def test_owner_returns_user_id(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO users (github_id, username) VALUES (%s, 'owner-test') RETURNING id",
+            (987654321,),
+        )
+        user_id = cur.fetchone()[0]
+        cur.execute(
+            "INSERT INTO documents (user_id, filename, doc_type, status) "
+            "VALUES (%s, 'o.pdf', 'pdf', 'ready') RETURNING id",
+            (user_id,),
+        )
+        doc_id = cur.fetchone()[0]
+    conn.commit()
+    try:
+        row = fetch_document_owner(conn, str(doc_id))
+        assert row is not None
+        assert row["user_id"] == str(user_id)
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
+            cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        conn.commit()
+
+
+def test_owner_null_when_unowned(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO documents (filename, doc_type, status) "
+            "VALUES ('anon.pdf', 'pdf', 'ready') RETURNING id"
+        )
+        doc_id = cur.fetchone()[0]
+    conn.commit()
+    try:
+        row = fetch_document_owner(conn, str(doc_id))
+        assert row is not None
+        assert row["user_id"] is None
+    finally:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
+        conn.commit()
+
+
+def test_owner_none_when_absent(conn):
+    assert fetch_document_owner(conn, str(uuid.uuid4())) is None
