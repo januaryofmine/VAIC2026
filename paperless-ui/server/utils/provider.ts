@@ -1,5 +1,6 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { instrumentFetch } from "./llm-trace";
 
 /**
  * LLM provider selection (env-driven, defaults unchanged).
@@ -19,7 +20,8 @@ export function getModel(model: string) {
 
   if (ai.provider !== "openai-compatible") {
     // The AI SDK reads ANTHROPIC_API_KEY from the environment when no apiKey is passed.
-    return createAnthropic()(model);
+    // instrumentFetch is a no-op unless LANGFUSE_* keys are set (see llm-trace.ts).
+    return createAnthropic({ fetch: instrumentFetch(globalThis.fetch) })(model);
   }
 
   const gateway = createOpenAICompatible({
@@ -29,7 +31,7 @@ export function getModel(model: string) {
     // Make the SDK emit the JSON schema; the fetch below rewrites it into the
     // json_object form gateways actually accept (see makeGatewayFetch).
     supportsStructuredOutputs: true,
-    fetch: makeGatewayFetch(ai.disableReasoning),
+    fetch: instrumentFetch(makeGatewayFetch(ai.disableReasoning)),
   });
   return gateway(model);
 }

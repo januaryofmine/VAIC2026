@@ -28,11 +28,18 @@ def retrieve_endpoint(
         anthropic_api_key=settings.anthropic_api_key,
     )
     top_k = req.top_k or settings.retrieval_top_k
+    # Two-stage retrieval: when the cross-encoder runs, stage 1 must hand it a WIDER
+    # pool than the caller asked for — the reranker can only promote a chunk that
+    # stage 1 actually returned. Fetching just top_k here would let it reorder the
+    # same k rows and never rescue a correct chunk that ranked, say, 12th.
+    fetch_k = (
+        max(top_k, settings.retrieval_candidates) if settings.reranker_enabled else top_k
+    )
     rows = retrieve(
         conn,
         reformulated,
         str(req.document_id),
-        top_k,
+        fetch_k,
         over_fetch_multiplier=settings.over_fetch_multiplier,
         rrf_k=settings.rrf_k,
         min_chunk_chars=settings.min_chunk_chars,
@@ -41,8 +48,8 @@ def retrieve_endpoint(
     if settings.reranker_enabled:
         rows = rerank(reformulated, rows, top_k, settings.reranker_model)
     logger.info(
-        "retrieve doc=%s q=%r -> %d chunks (rerank=%s)",
-        req.document_id, reformulated, len(rows), settings.reranker_enabled,
+        "retrieve doc=%s q=%r -> %d chunks (rerank=%s, stage1=%d)",
+        req.document_id, reformulated, len(rows), settings.reranker_enabled, fetch_k,
     )
     chunks = [
         RetrieveChunk(
@@ -55,4 +62,6 @@ def retrieve_endpoint(
         )
         for r in rows
     ]
-    return RetrieveResponse(chunks=chunks, reformulated_query=reformulated)
+    return RetrieveResponse(
+        chunks=chunks, reformulated_query=reformulated, reranked=settings.reranker_enabled
+    )
