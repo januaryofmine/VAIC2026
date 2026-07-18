@@ -33,6 +33,7 @@ uploads/
 
 # git worktrees (pipeline tạo ở .worktrees/)
 .worktrees/
+docs/Tasks/
 
 # os
 .DS_Store
