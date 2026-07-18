@@ -20,10 +20,14 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import random
 import re
 import time
 from pathlib import Path
+
+# Reduce fragmentation OOM on 16GB GPUs (must be set before torch inits CUDA).
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import torch
 import torch.nn as nn
@@ -60,10 +64,13 @@ def build_zalo_triples(neg_per_pos: int, max_queries: int | None) -> list[dict]:
 
     repo = "GreenNode/zalo-ai-legal-text-retrieval-vn"
     log("loading Zalo corpus/queries/qrels ...")
-    corpus = load_dataset(repo, "corpus")["corpus"]
-    queries = load_dataset(repo, "queries")["queries"]
-    qrels_ds = load_dataset(repo, "qrels")
-    qrels = qrels_ds[list(qrels_ds.keys())[0]]  # 'train'/'test'/'default'
+
+    def _first_split(ds):  # each config exposes one split (named 'test' here, not the config name)
+        return ds[list(ds.keys())[0]]
+
+    corpus = _first_split(load_dataset(repo, "corpus"))
+    queries = _first_split(load_dataset(repo, "queries"))
+    qrels = _first_split(load_dataset(repo, "qrels"))
 
     c0 = corpus[0]
     cid_key = first_key(c0, "_id", "id", "corpus-id", "doc_id")
@@ -179,18 +186,25 @@ def train(args) -> None:
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model)
     model = AutoModelForSequenceClassification.from_pretrained(args.base_model, num_labels=1).to(device)
+    # Gradient checkpointing trades compute for memory — lets a 568M cross-encoder
+    # fine-tune on a 16GB GPU (P100). use_cache must be off for checkpointing.
+    model.config.use_cache = False
+    model.gradient_checkpointing_enable()
 
     ds = PairDataset(triples)
     loader = DataLoader(
         ds, batch_size=args.batch_size, shuffle=True,
         collate_fn=Collator(tokenizer, args.max_len), num_workers=args.num_workers, drop_last=True,
     )
-    log(f"training samples={len(ds)}  steps/epoch={len(loader)}")
+    accum = max(1, args.grad_accum)
+    steps_per_epoch = len(loader) // accum
+    total_steps = steps_per_epoch * args.epochs
+    warmup = int(0.1 * total_steps)
+    log(f"training samples={len(ds)}  batches/epoch={len(loader)}  "
+        f"optim-steps/epoch={steps_per_epoch}  (batch={args.batch_size} x accum={accum})")
 
     loss_fn = nn.BCEWithLogitsLoss()
     optim = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
-    total_steps = len(loader) * args.epochs
-    warmup = int(0.1 * total_steps)
 
     def lr_lambda(step):  # linear warmup then linear decay
         if step < warmup:
@@ -204,24 +218,26 @@ def train(args) -> None:
     step = 0
     for epoch in range(args.epochs):
         running = 0.0
-        for enc, labels in loader:
+        optim.zero_grad(set_to_none=True)
+        for bidx, (enc, labels) in enumerate(loader):
             enc = {k: v.to(device) for k, v in enc.items()}
             labels = labels.to(device)
-            optim.zero_grad(set_to_none=True)
             with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=(device == "cuda")):
                 logits = model(**enc).logits.squeeze(-1)
-                loss = loss_fn(logits, labels)
+                loss = loss_fn(logits, labels) / accum
             scaler.scale(loss).backward()
-            scaler.unscale_(optim)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            scaler.step(optim)
-            scaler.update()
-            sched.step()
-            running += loss.item()
-            step += 1
-            if step % args.log_every == 0:
-                log(f"epoch {epoch} step {step}/{total_steps} loss {running/args.log_every:.4f} lr {sched.get_last_lr()[0]:.2e}")
-                running = 0.0
+            running += loss.item() * accum
+            if (bidx + 1) % accum == 0:  # apply an optimizer step every `accum` batches
+                scaler.unscale_(optim)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                scaler.step(optim)
+                scaler.update()
+                sched.step()
+                optim.zero_grad(set_to_none=True)
+                step += 1
+                if step % args.log_every == 0:
+                    log(f"epoch {epoch} step {step}/{total_steps} loss {running/(args.log_every*accum):.4f} lr {sched.get_last_lr()[0]:.2e}")
+                    running = 0.0
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -236,7 +252,8 @@ def main() -> None:
     ap.add_argument("--indomain", default="train_indomain.jsonl")
     ap.add_argument("--out", default="bge-reranker-dienbien")
     ap.add_argument("--epochs", type=int, default=2)
-    ap.add_argument("--batch-size", type=int, default=16)
+    ap.add_argument("--batch-size", type=int, default=8)
+    ap.add_argument("--grad-accum", type=int, default=2, help="optimizer step every N batches")
     ap.add_argument("--lr", type=float, default=2e-5)
     ap.add_argument("--max-len", type=int, default=512)
     ap.add_argument("--neg-per-pos", type=int, default=7)

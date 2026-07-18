@@ -7,7 +7,7 @@ rank by similarity, returning page/section so the answer can cite them.
 import psycopg
 from psycopg.rows import dict_row
 
-from app.services.embedding import embed_query
+from app.services.embed_provider import embed_query
 
 # Scope by document_id is mandatory: never mix chunks across uploaded documents.
 # %(vector)s::vector cast: the list param arrives as double precision[]; the `<=>`

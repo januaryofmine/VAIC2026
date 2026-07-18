@@ -1,0 +1,13 @@
+# retrieval-api on Vercel Python — torch-free (embeddings via an external API).
+# The embedding provider is chosen at runtime via EMBEDDING_PROVIDER; only the
+# lightweight HTTP client (httpx) is needed here. Do NOT add torch/sentence-
+# transformers — that path is for local/self-hosted only and blows the 250MB cap.
+fastapi
+psycopg[binary]
+pgvector
+pydantic-settings
+httpx
+python-multipart
+python-docx
+pdfplumber
+anthropic

@@ -134,16 +134,22 @@ def main() -> None:
 
     for name, path in [("+ bge-reranker base", args.base_model),
                        ("+ fine-tuned reranker", args.finetuned)]:
-        if not Path(path).exists() and "/" not in path:
-            print(f"skip {name}: {path} not found")
+        # A local dir (starts with / or ./) that doesn't exist means training didn't
+        # produce it — skip so the summary still prints. Hub ids (e.g. "BAAI/...") load.
+        is_local = path.startswith(("/", "./", "../", ".\\"))
+        if is_local and not Path(path).exists():
+            print(f"skip {name}: {path} not found (train may not have saved a model)")
             continue
-        tok = AutoTokenizer.from_pretrained(path)
-        mdl = AutoModelForSequenceClassification.from_pretrained(path, num_labels=1).to(device).eval()
-        results[name] = eval_ranker(
-            name, eval_rows, text_of,
-            lambda q, ts, m=mdl, t=tok: ce_scores(m, t, device, q, ts, args.max_len))
-        del mdl
-        torch.cuda.empty_cache() if device == "cuda" else None
+        try:
+            tok = AutoTokenizer.from_pretrained(path)
+            mdl = AutoModelForSequenceClassification.from_pretrained(path, num_labels=1).to(device).eval()
+            results[name] = eval_ranker(
+                name, eval_rows, text_of,
+                lambda q, ts, m=mdl, t=tok: ce_scores(m, t, device, q, ts, args.max_len))
+            del mdl
+            torch.cuda.empty_cache() if device == "cuda" else None
+        except Exception as e:
+            print(f"skip {name}: load/eval failed: {e}")
 
     # summary table
     print("\n\n==================== SUMMARY ====================")

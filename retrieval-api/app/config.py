@@ -5,9 +5,12 @@ class Settings(BaseSettings):
     database_url: str = ""
     cors_origins: list[str] = ["http://localhost:3000"]
 
-    # embedding (query side) — must match the ingestion model (multilingual-e5-large)
+    # embedding (query side) — must match the ingestion model / dim.
+    # provider: "e5" (self-hosted sentence-transformers) | "gemini" (API, no torch).
+    embedding_provider: str = "e5"
     embedding_model: str = "intfloat/multilingual-e5-large"
     embedding_prefix_query: str = "query: "
+    gemini_api_key: str = ""
     retrieval_top_k: int = 5
 
     # reranking (optional 2nd stage). Disabled by default → identical old behavior.

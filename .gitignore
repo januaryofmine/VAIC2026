@@ -41,3 +41,8 @@ finetune/kaggle_staging/
 finetune/kaggle_kernel/
 # kaggle credentials (safety — normally in ~/.kaggle)
 kaggle.json
+
+# generated deploy staging + local vercel/hf state
+deploy/.vercel-api-build/
+.vercel/
+.gstack/

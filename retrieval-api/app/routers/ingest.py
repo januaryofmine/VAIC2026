@@ -59,7 +59,10 @@ async def ingest_endpoint(file: UploadFile = File(...)) -> dict:
 
     global _embedder
     if _embedder is None:
-        _embedder = E5Embedder()
+        # Gemini (API) embedder if configured, else rag-pipeline's local e5.
+        from app.services.embed_provider import get_document_embedder
+
+        _embedder = get_document_embedder() or E5Embedder()
 
     # Preserve the original filename (rag_ingest records Path(path).name).
     tmpdir = tempfile.mkdtemp()
