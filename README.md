@@ -2,7 +2,7 @@
 
 # Paperless
 
-**AI for document processing & meeting preparation** — built for the **VAIC 2026**.
+AI for document processing & meeting preparation, built for the **VAIC 2026**.
 
 ![Paperless](./docs/paperless-screenshot.png)
 
