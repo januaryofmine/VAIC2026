@@ -70,8 +70,54 @@ cụ thể trang + Điều. (Xem `retrieval-api` + demo serving ở mục 1.)
 
 ---
 
+## 4. AI monitoring — đo hệ thống khi chạy (yêu cầu #5: An toàn AI, Grounding & Độ tin cậy)
+
+Mọi lời gọi LLM và mỗi lần truy xuất đều sinh trace (Langfuse; hoặc sink JSONL cục bộ
+cho bản on-prem không được gửi dữ liệu ra ngoài). Chỉ đẩy `page`/`section`, **không** đẩy
+toàn văn chunk — tài liệu pháp lý.
+
+### 4.1 Latency mỗi lời gọi LLM (n=17, doc 56)
+| Bước | n | P50 | P95 | Token in | Token out |
+|------|---|-----|-----|----------|-----------|
+| summarize-map | 4 | 3.45s | 6.27s | 53.744 | 1.639 |
+| summarize-reduce | 1 | 3.67s | — | 3.751 | 328 |
+| terms-map | 4 | 2.94s | 4.28s | 53.708 | 774 |
+| terms-reduce | 1 | 5.17s | — | 2.873 | 692 |
+| questions-map | 4 | 5.29s | 5.90s | 53.700 | 1.895 |
+| questions-reduce | 1 | 5.52s | — | 3.981 | 618 |
+| **Tổng** | **17** | **4.28s** | **6.27s** | **175.791** | **5.954** |
+
+> ⚠️ P95 ở đây là latency **một lời gọi**. Ngân sách "< 60s" của đề bài là **end-to-end
+> cả bước** (các call map chạy song song rồi mới reduce) — số end-to-end nằm ở mục 2.
+
+### 4.2 Grounding — LLM-as-judge trên 18 câu held-out
+| Metric | Ngữ cảnh bình thường | Đối chứng âm (bỏ chunk chứa đáp án) |
+|--------|----------------------|--------------------------------------|
+| groundedness | 1.000 | **1.000** |
+| citation_accuracy | 100% | 66,7% |
+| **answered** | **100%** | **11,1%** |
+
+**Kết luận đáng giá nhất:** khi truy xuất trượt, hệ thống **từ chối trả lời thay vì bịa**
+(`answered` 100% → 11,1%). Đây là bằng chứng an toàn, không phải suy đoán.
+
+### 4.3 Ba giới hạn phải nói trước (đừng để giám khảo phát hiện hộ)
+1. **`groundedness` = 1.000 ở CẢ HAI điều kiện ⇒ tự nó không chứng minh gì.** Câu từ chối
+   cũng được tính là "có căn cứ", nên một hệ thống luôn từ chối vẫn đạt điểm tuyệt đối.
+   Chỉ khi ghép với `answered` mới thấy tín hiệu. Không dùng con số 1.000 làm điểm nhấn.
+2. **Giám khảo LLM không tất định:** cùng dữ liệu, n=5 cho citation 80%, n=18 cho 100%.
+   Coi là chỉ báo, chưa phải số đo chính xác (muốn vững phải chạy lặp lấy trung bình).
+3. **Cỡ mẫu nhỏ** (18 câu, 1 tài liệu) và chạy qua gateway 9router/deepseek — không phải
+   model production (Claude). Số mang tính khả thi, chưa phải benchmark.
+
+Tái lập: `node paperless-ui/scripts/test-prep-pack.mjs` · `node paperless-ui/scripts/trace-stats.mjs --md`
+· `node paperless-ui/scripts/eval-groundedness.mjs --n 18 [--adversarial]`
+
+---
+
 ## Tóm tắt cho deck (1 slide)
 - ✅ **5/5 yêu cầu chức năng** có bằng chứng đo được trên tài liệu 59 trang thật.
 - ✅ **Reranker PyTorch tự train (LoRA)** vượt baseline trên held-out — R@1 0.72→0.83→**0.89**.
 - ✅ **Prep-pack < 60s**: tóm tắt 11.9s, thuật ngữ 12, câu hỏi 5 — tất cả ĐẠT.
 - ✅ **Grounding**: trích dẫn trang/Điều truy vết được, reranker đưa đúng chunk lên #1 (18/18).
+- ✅ **Giám sát AI khi chạy**: mọi lời gọi LLM + truy xuất đều có trace (latency/token/citation).
+  Khi truy xuất trượt, hệ thống **từ chối thay vì bịa** — `answered` 100% → 11,1% ở đối chứng âm.
