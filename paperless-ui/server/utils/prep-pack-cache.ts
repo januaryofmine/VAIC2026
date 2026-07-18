@@ -1,6 +1,7 @@
 import type { H3Event } from "h3";
 
 import type { FullDocument, PrepPackCache, PrepPackKind } from "../types/retrieval";
+import { setServerTiming } from "./server-timing";
 
 export interface PrepPackDeps<T> {
   getCache: (documentId: string) => Promise<PrepPackCache>;
@@ -41,7 +42,9 @@ export async function cachedPrepPack<T>(
     throw createError({ statusCode: 400, statusMessage: "document_id is required" });
   }
   // Authorize: caller must be signed in AND own this document (prep-pack runs Claude → cost).
+  const t0 = performance.now();
   await requireDocumentAccess(event, document_id);
+  const t1 = performance.now();
   const { document_id: id, filename, value } = await resolvePrepPack<T>(document_id, kind, {
     getCache: getPrepPack,
     loadDoc: async (docId) => {
@@ -54,5 +57,10 @@ export async function cachedPrepPack<T>(
     compute,
     saveCache: savePrepPack,
   });
+  // Server-Timing: surface the owner-check vs cache/compute split in DevTools (Bậc 2).
+  setServerTiming(event, [
+    { name: "owner", dur: t1 - t0, desc: "ownership check" },
+    { name: "prep-pack", dur: performance.now() - t1, desc: `${kind} cache/compute` },
+  ]);
   return { document_id: id, filename, [kind]: value };
 }
