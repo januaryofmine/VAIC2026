@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     api_key: str = ""
     max_upload_mb: int = 25  # reject oversized ingest uploads (DoS guard)
 
+    # BFF base URL for the backend-driven prep-pack trigger: after embedding, this
+    # service calls {bff_url}/api/internal/prep-pack so summary/terms/questions are
+    # generated + stored without a user opening the doc. Empty = no trigger (the
+    # on-open endpoints still work as a fallback). Env: BFF_URL.
+    bff_url: str = ""
+
     # embedding (query side) — must match the ingestion model (multilingual-e5-large)
     embedding_model: str = "intfloat/multilingual-e5-large"
     embedding_prefix_query: str = "query: "
