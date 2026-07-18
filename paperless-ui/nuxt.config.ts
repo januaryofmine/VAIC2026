@@ -12,6 +12,10 @@ export default defineNuxtConfig({
   app: {
     head: { title: "Paperless Meetings" },
   },
+  // Pre-bundle the PDF viewer so Vite resolves its worker asset cleanly in dev.
+  vite: {
+    optimizeDeps: { include: ["vue-pdf-embed"] },
+  },
   runtimeConfig: {
     // NUXT_RETRIEVAL_API_HOST overrides in prod
     retrievalApiHost: "http://localhost:8001",
