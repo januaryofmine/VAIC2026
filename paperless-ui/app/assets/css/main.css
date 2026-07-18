@@ -1,2 +1,60 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+/* Paperless design system (Slice 18): navy + gold. Custom Tailwind palettes so
+   Nuxt UI's `primary`/`secondary` aliases resolve to our brand colors. */
+@theme static {
+  --font-sans: "Be Vietnam Pro", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Centered so shade 500 = brand navy #1D2B4A (Nuxt UI's primary uses 500). */
+  --color-navy-50: #f2f4f8;
+  --color-navy-100: #e3e8f0;
+  --color-navy-200: #c6d0e0;
+  --color-navy-300: #9aabc7;
+  --color-navy-400: #5c749d;
+  --color-navy-500: #1d2b4a;
+  --color-navy-600: #1a2743;
+  --color-navy-700: #16213a;
+  --color-navy-800: #131e35;
+  --color-navy-900: #0f1626;
+  --color-navy-950: #090e1a;
+
+  --color-gold-50: #fbf8ec;
+  --color-gold-100: #f6eecb;
+  --color-gold-200: #eeda93;
+  --color-gold-300: #e5c45c;
+  --color-gold-400: #d9ad35;
+  --color-gold-500: #c9a227;
+  --color-gold-600: #ad8a1c;
+  --color-gold-700: #8a6a19;
+  --color-gold-800: #73561b;
+  --color-gold-900: #62481b;
+  --color-gold-950: #39280b;
+}
+
+/* Brand tokens for the hand-styled screens (Home header, table, filter bar). */
+:root {
+  --pl-navy: #1d2b4a;
+  --pl-navy-hi: #29406e;
+  --pl-navy-deep: #131e35;
+  --pl-gold: #c9a227;
+  --pl-gold-hi: #ad8a1c;
+  --pl-ground: #f4f6f9;
+  --pl-border: #e3e7ee;
+  --pl-border-strong: #d3d9e4;
+  --pl-text: #1a2233;
+  --pl-text-2: #586074;
+  --pl-text-3: #8b93a4;
+  --pl-ok: #15803d;
+  --pl-ok-bg: #e7f5ec;
+  --pl-warn: #b45309;
+  --pl-warn-bg: #fbeedd;
+  --pl-err: #b91c1c;
+  --pl-err-bg: #faeaea;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--pl-ground);
+  color: var(--pl-text);
+}

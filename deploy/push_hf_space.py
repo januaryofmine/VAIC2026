@@ -1,11 +1,16 @@
 """Create the HF Space (Docker), upload retrieval-api + rag-pipeline, and set its
-runtime env (DATABASE_URL secret + CORS/reranker variables).
+runtime env (DATABASE_URL + API_KEY secrets, CORS variable).
 
-Secrets (HF_TOKEN, HF_USER, DATABASE_URL) are read from a secrets file so nothing
-sensitive is passed on the command line.
+Secrets (HF_TOKEN, HF_USER, DATABASE_URL, API_KEY) are read from a secrets file so
+nothing sensitive is passed on the command line.
+
+S1 fix vs the original PR: sets an API_KEY secret (gates every /api route except
+healthz) and a *scoped* CORS_ORIGINS instead of "*".
 
 Usage:
-    python deploy/push_hf_space.py --secrets <path> [--space vaic-retrieval]
+    uv run --with huggingface_hub python deploy/push_hf_space.py \
+        --secrets deploy/.secrets [--space vaic-retrieval] \
+        [--cors https://your-ui.vercel.app]
 """
 
 from __future__ import annotations
@@ -46,14 +51,26 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--secrets", required=True)
     ap.add_argument("--space", default="vaic-retrieval")
+    ap.add_argument(
+        "--cors",
+        default="",
+        help="comma-separated allowed origins for CORS_ORIGINS (scoped, not '*'). "
+        "The UI proxy calls server-to-server so this is defense-in-depth; the real "
+        "gate is API_KEY.",
+    )
     args = ap.parse_args()
 
     sec = read_secrets(Path(args.secrets))
     token = sec.get("HF_TOKEN")
     user = sec.get("HF_USER")
     db_url = sec.get("DATABASE_URL")
+    api_key = sec.get("API_KEY")
     if not token or not user:
         print("ERROR: HF_TOKEN / HF_USER missing in secrets file", file=sys.stderr)
+        return 1
+    if not db_url:
+        print("ERROR: DATABASE_URL missing in secrets file (run load_schema.py first)",
+              file=sys.stderr)
         return 1
 
     from huggingface_hub import HfApi
@@ -64,13 +81,21 @@ def main() -> int:
     api.create_repo(repo_id=repo_id, repo_type="space", space_sdk="docker", exist_ok=True)
     print(f"space ready: https://huggingface.co/spaces/{repo_id}")
 
-    # Runtime env: DATABASE_URL as a secret; the rest as public variables.
-    if db_url:
-        api.add_space_secret(repo_id=repo_id, key="DATABASE_URL", value=db_url)
-        print("set secret DATABASE_URL")
-    api.add_space_variable(repo_id=repo_id, key="CORS_ORIGINS", value='["*"]')
-    api.add_space_variable(repo_id=repo_id, key="RERANKER_ENABLED", value="false")
-    print("set variables CORS_ORIGINS, RERANKER_ENABLED")
+    # Runtime env: DATABASE_URL + API_KEY as secrets; CORS as a public variable.
+    api.add_space_secret(repo_id=repo_id, key="DATABASE_URL", value=db_url)
+    print("set secret DATABASE_URL")
+    if api_key:
+        api.add_space_secret(repo_id=repo_id, key="API_KEY", value=api_key)
+        print("set secret API_KEY (all /api routes except /api/healthz now gated)")
+    else:
+        print("WARN: no API_KEY in secrets → API is PUBLIC. Add API_KEY to secure it.")
+
+    # S1: scoped CORS. Default to localhost when no --cors given (update after B4
+    # once the Vercel UI domain is known). '*' is intentionally avoided.
+    origins = args.cors.strip() or "http://localhost:3000"
+    cors_json = "[" + ",".join(f'"{o.strip()}"' for o in origins.split(",")) + "]"
+    api.add_space_variable(repo_id=repo_id, key="CORS_ORIGINS", value=cors_json)
+    print(f"set variable CORS_ORIGINS={cors_json}")
 
     staging = Path(tempfile.mkdtemp()) / "space"
     try:

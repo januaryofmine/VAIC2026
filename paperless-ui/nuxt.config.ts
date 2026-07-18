@@ -2,14 +2,26 @@
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: false },
-  modules: ["@nuxt/ui"],
+  // Fixed port so the GitHub OAuth callback (…:3100/api/auth/github) always matches.
+  devServer: { port: 3100 },
+  modules: ["@nuxt/ui", "@nuxt/fonts", "nuxt-auth-utils"],
+  // The design is light-only; don't follow OS dark mode. A fresh storageKey ignores
+  // any stale 'dark' a browser stored before this was set (else it would override).
+  colorMode: { preference: "light", fallback: "light", storageKey: "pl-color-mode" },
   css: ["~/assets/css/main.css"],
   app: {
     head: { title: "Paperless Meetings" },
   },
+  // Pre-bundle the PDF viewer so Vite resolves its worker asset cleanly in dev.
+  vite: {
+    optimizeDeps: { include: ["vue-pdf-embed"] },
+  },
   runtimeConfig: {
     // NUXT_RETRIEVAL_API_HOST overrides in prod
     retrievalApiHost: "http://localhost:8001",
+    // Shared secret for the retrieval-api (X-API-Key). NUXT_RETRIEVAL_API_KEY in prod.
+    // Empty in local dev → retrieval-api leaves its endpoints open.
+    retrievalApiKey: "",
     ai: {
       // Anthropic key is read from ANTHROPIC_API_KEY by the AI SDK directly.
       // provider: "anthropic" (default) | "openai-compatible" (e.g. 9router gateway).

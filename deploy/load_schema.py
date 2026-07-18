@@ -13,6 +13,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 import psycopg
 
@@ -68,9 +69,10 @@ def main() -> int:
         return 1
 
     user = f"postgres.{args.ref}"
+    pw_enc = quote(pw, safe="")  # password may contain @, :, / etc. — URL-encode it
     candidates = [
-        f"postgresql://{user}:{pw}@aws-0-{args.region}.pooler.supabase.com:{args.port}/postgres",
-        f"postgresql://{user}:{pw}@aws-1-{args.region}.pooler.supabase.com:{args.port}/postgres",
+        f"postgresql://{user}:{pw_enc}@aws-0-{args.region}.pooler.supabase.com:{args.port}/postgres",
+        f"postgresql://{user}:{pw_enc}@aws-1-{args.region}.pooler.supabase.com:{args.port}/postgres",
     ]
 
     conn = None

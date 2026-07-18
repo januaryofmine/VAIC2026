@@ -3,10 +3,23 @@
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- ── users ────────────────────────────────────────────────────
+-- GitHub-authenticated users (Slice 18). Documents are scoped per user.
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  github_id BIGINT NOT NULL UNIQUE,          -- stable GitHub account id (upsert key)
+  username TEXT NOT NULL,                     -- GitHub login
+  name TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_login_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ── documents ────────────────────────────────────────────────
 -- One row per file a user uploads. The ingestion pipeline updates `status`.
 CREATE TABLE IF NOT EXISTS documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,  -- owner (Slice 18); NULL for pre-Slice-18 docs
   filename TEXT NOT NULL,
   doc_type TEXT NOT NULL,                    -- 'pdf' | 'docx'
   page_count INTEGER,                        -- page count (PDF); NULL until parsed
@@ -20,13 +33,26 @@ CREATE TABLE IF NOT EXISTS documents (
     CHECK (status IN ('pending', 'parsing', 'embedding', 'ready', 'failed'))
 );
 
--- Dedup: identical file re-uploaded → reuse the existing document instead of re-ingesting.
--- UNIQUE (partial) so a concurrent double-upload can't create two rows for the same
--- content; ingest catches the violation and reuses the winner. Excludes 'failed' so a
--- file that failed once can be re-uploaded for a fresh attempt (and NULL hashes, of which
--- there may be many from pre-Slice-17 docs).
+-- List "my documents" (Home): filter by owner, newest first.
+CREATE INDEX IF NOT EXISTS documents_user_idx ON documents (user_id, uploaded_at DESC);
+
+-- Dedup: a user re-uploading the same file reuses their existing document instead of
+-- re-ingesting. UNIQUE (partial) per (owner, content) so a concurrent double-upload can't
+-- create two rows; ingest catches the violation and reuses the winner. Scoped by user_id
+-- so two users may each own a copy. Excludes 'failed' (retryable) and NULL hashes.
 CREATE UNIQUE INDEX IF NOT EXISTS documents_content_hash_uniq
-  ON documents (content_hash) WHERE content_hash IS NOT NULL AND status <> 'failed';
+  ON documents (user_id, content_hash) WHERE content_hash IS NOT NULL AND status <> 'failed';
+
+-- ── prep_packs ───────────────────────────────────────────────
+-- Cache for the LLM prep-pack (summary/terms/questions), one row per document.
+-- Each kind is computed once with Claude then reused → re-opens are instant + free.
+CREATE TABLE IF NOT EXISTS prep_packs (
+  document_id UUID PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+  summary JSONB,
+  terms JSONB,
+  questions JSONB,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- ── chunks ───────────────────────────────────────────────────
 -- Heart of citation. Scoped by document_id, carries page (PDF) + section (Điều/Khoản).
@@ -61,6 +87,9 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
 
 CREATE INDEX IF NOT EXISTS chat_sessions_document_idx
   ON chat_sessions (document_id, updated_at DESC);
+-- One chat session per document (Slice 14b): get-or-create is race-safe via this.
+CREATE UNIQUE INDEX IF NOT EXISTS chat_sessions_document_uniq
+  ON chat_sessions (document_id) WHERE document_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS chat_messages (
   id TEXT PRIMARY KEY,

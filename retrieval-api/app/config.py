@@ -5,6 +5,12 @@ class Settings(BaseSettings):
     database_url: str = ""
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Shared-secret gate (S1). Empty = open (local dev). When set, every /api route
+    # except /api/healthz requires header `X-API-Key: <api_key>`. Set it on the
+    # public cloud host; the Nuxt proxy forwards the same key.
+    api_key: str = ""
+    max_upload_mb: int = 25  # reject oversized ingest uploads (DoS guard)
+
     # embedding (query side) — must match the ingestion model / dim.
     # provider: "e5" (self-hosted sentence-transformers) | "gemini" (API, no torch).
     embedding_provider: str = "e5"

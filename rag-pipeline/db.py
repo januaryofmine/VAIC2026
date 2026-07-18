@@ -19,17 +19,20 @@ def connect(database_url: str) -> psycopg.Connection:
     return conn
 
 
-def find_document_by_hash(conn: psycopg.Connection, content_hash: str) -> str | None:
-    """Return the id of a non-failed document with this content hash (dedup), else None.
+def find_document_by_hash(
+    conn: psycopg.Connection, content_hash: str, user_id: str | None = None
+) -> str | None:
+    """Return the id of this owner's non-failed document with this content hash, else None.
 
-    Excludes 'failed' so a file that failed to ingest can be re-uploaded for a fresh
-    attempt instead of dedup-ing back to the broken row.
+    Scoped by user_id so dedup only matches the same owner's uploads. Excludes 'failed'
+    so a file that failed to ingest can be re-uploaded for a fresh attempt.
     """
     with conn.cursor() as cur:
         cur.execute(
             "SELECT id FROM documents "
-            "WHERE content_hash = %s AND status <> 'failed' ORDER BY uploaded_at LIMIT 1",
-            (content_hash,),
+            "WHERE content_hash = %s AND user_id IS NOT DISTINCT FROM %s "
+            "AND status <> 'failed' ORDER BY uploaded_at LIMIT 1",
+            (content_hash, user_id),
         )
         row = cur.fetchone()
     return str(row[0]) if row else None
@@ -44,13 +47,15 @@ def insert_document(
     content_hash: str | None = None,
     storage_path: str | None = None,
     size_bytes: int | None = None,
+    user_id: str | None = None,
 ) -> str:
     with conn.cursor() as cur:
         cur.execute(
             "INSERT INTO documents "
-            "(filename, doc_type, page_count, status, content_hash, storage_path, size_bytes) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (filename, doc_type, page_count, status, content_hash, storage_path, size_bytes),
+            "(filename, doc_type, page_count, status, content_hash, storage_path, size_bytes, user_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (filename, doc_type, page_count, status, content_hash, storage_path,
+             size_bytes, user_id),
         )
         doc_id = cur.fetchone()[0]
     conn.commit()

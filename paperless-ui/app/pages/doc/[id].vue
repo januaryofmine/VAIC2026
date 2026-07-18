@@ -48,11 +48,17 @@ const statusLabel = computed(
       </div>
     </UCard>
 
-    <ClientOnly v-else>
-      <div class="space-y-4" data-testid="doc-ready">
-        <PrepPack :document-id="documentId" />
-        <ChatPanel :document-id="documentId" />
-      </div>
-    </ClientOnly>
+    <div
+      v-else
+      class="grid grid-cols-1 items-start gap-4 lg:grid-cols-2"
+      data-testid="doc-ready"
+    >
+      <DocViewer
+        :document-id="documentId"
+        :doc-type="info?.doc_type"
+        :filename="info?.filename"
+      />
+      <DocTabs :document-id="documentId" />
+    </div>
   </div>
 </template>

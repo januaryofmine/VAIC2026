@@ -10,6 +10,7 @@ data/
 .env
 .env.*
 !.env.sample
+deploy/.secrets
 
 # python (rag-pipeline, retrieval-api)
 __pycache__/
@@ -32,6 +33,7 @@ uploads/
 
 # git worktrees (pipeline tạo ở .worktrees/)
 .worktrees/
+docs/Tasks/
 
 # os
 .DS_Store

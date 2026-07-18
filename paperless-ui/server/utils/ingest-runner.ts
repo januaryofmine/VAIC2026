@@ -23,9 +23,12 @@ export function startIngestion(
   ragPipelineDir: string,
   onDone?: () => void,
   earlyTimeoutMs = 60_000,
+  userId?: string,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn("uv", ["run", "python", "ingest.py", filePath], {
+    const args = ["run", "python", "ingest.py", filePath];
+    if (userId) args.push("--user-id", userId); // owner scope (Slice 18)
+    const child = spawn("uv", args, {
       cwd: ragPipelineDir,
       env: process.env,
     });

@@ -1,30 +1,25 @@
 ---
 title: VAIC Retrieval API
 emoji: 📄
-colorFrom: blue
-colorTo: indigo
+colorFrom: indigo
+colorTo: blue
 sdk: docker
 app_port: 7860
 pinned: false
 ---
 
-# VAIC2026 — Retrieval API (retrieval-api + rag-pipeline)
+# Paperless Meetings — Retrieval API (HF Space)
 
-FastAPI service for the Paperless Meetings system:
+FastAPI `retrieval-api` + `rag-pipeline` (ingest) in one Docker container. Serves the
+Vietnamese legal-document RAG engine: hybrid retrieval, plain-fetch, ingest over HTTP.
 
-- `POST /api/ingest` — upload PDF/DOCX → parse → chunk → embed (e5) → Postgres/pgvector
-- `POST /api/retrieve` — vector search (+ optional cross-encoder reranker) with page/section citations
-- `GET  /api/documents/{id}/full` — full ordered chunk list
-- `GET  /api/healthz`
+- `GET  /api/healthz` — liveness (no auth)
+- `POST /api/ingest` — upload PDF/DOCX → parse/chunk/embed/store (auth)
+- `POST /api/retrieve` — hybrid vector+FTS search, scoped to a document (auth)
+- `GET  /api/documents/{id}/full` · `/status` · `/file` (auth)
 
-## Required environment (Space → Settings → Variables & secrets)
+Embeddings: self-hosted `multilingual-e5-large` (1024-dim), pre-downloaded at build.
 
-| Name | Example | Notes |
-|------|---------|-------|
-| `DATABASE_URL` | `postgresql://...supabase.co:5432/postgres` | Supabase (pgvector). **Secret.** |
-| `CORS_ORIGINS` | `["https://your-ui.vercel.app"]` | JSON list; the Vercel UI origin |
-| `RERANKER_ENABLED` | `false` | `true` to turn on the reranker stage |
-| `RERANKER_MODEL` | `honglongdng/bge-reranker-dienbien` | HF model id or local path |
-| `ANTHROPIC_API_KEY` | `sk-ant-...` | only if query reformulation via Claude is enabled |
-
-The embedding model (multilingual-e5-large) is baked into the image.
+**Auth:** every `/api` route except `/api/healthz` requires header `X-API-Key`
+when the `API_KEY` secret is set. **DB:** `DATABASE_URL` secret (Supabase pooler).
+Deployed via `deploy/push_hf_space.py`.
