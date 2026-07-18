@@ -47,3 +47,13 @@ export interface DocumentListItem {
 export interface DocumentListResponse {
   documents: DocumentListItem[];
 }
+
+export type PrepPackKind = "summary" | "terms" | "questions";
+
+export interface PrepPackCache {
+  document_id: string;
+  filename: string;
+  summary: unknown | null;
+  terms: unknown | null;
+  questions: unknown | null;
+}

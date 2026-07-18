@@ -43,6 +43,17 @@ CREATE INDEX IF NOT EXISTS documents_user_idx ON documents (user_id, uploaded_at
 CREATE UNIQUE INDEX IF NOT EXISTS documents_content_hash_uniq
   ON documents (user_id, content_hash) WHERE content_hash IS NOT NULL AND status <> 'failed';
 
+-- ── prep_packs ───────────────────────────────────────────────
+-- Cache for the LLM prep-pack (summary/terms/questions), one row per document.
+-- Each kind is computed once with Claude then reused → re-opens are instant + free.
+CREATE TABLE IF NOT EXISTS prep_packs (
+  document_id UUID PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+  summary JSONB,
+  terms JSONB,
+  questions JSONB,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ── chunks ───────────────────────────────────────────────────
 -- Heart of citation. Scoped by document_id, carries page (PDF) + section (Điều/Khoản).
 CREATE TABLE IF NOT EXISTS chunks (

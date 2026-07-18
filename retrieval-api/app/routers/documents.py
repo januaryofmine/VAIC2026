@@ -13,6 +13,8 @@ from app.models import (
     DocumentListResponse,
     DocumentStatusResponse,
     FullDocumentResponse,
+    PrepPackResponse,
+    PrepPackUpsertRequest,
 )
 from app.services.documents import (
     fetch_document_file,
@@ -20,6 +22,7 @@ from app.services.documents import (
     fetch_full_document,
     list_documents,
 )
+from app.services.prep_packs import get_prep_pack, upsert_prep_pack
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -95,6 +98,30 @@ def get_document_file(
         filename=row["filename"],
         content_disposition_type="inline",
     )
+
+
+@router.get("/documents/{document_id}/prep-pack", response_model=PrepPackResponse)
+def get_document_prep_pack(
+    document_id: UUID,
+    conn: psycopg.Connection = Depends(get_db),
+) -> PrepPackResponse:
+    row = get_prep_pack(conn, str(document_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    return PrepPackResponse(**row)
+
+
+@router.put("/documents/{document_id}/prep-pack")
+def put_document_prep_pack(
+    document_id: UUID,
+    body: PrepPackUpsertRequest,
+    conn: psycopg.Connection = Depends(get_db),
+) -> dict:
+    try:
+        upsert_prep_pack(conn, str(document_id), body.kind, body.value)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
 
 
 @router.get("/healthz")

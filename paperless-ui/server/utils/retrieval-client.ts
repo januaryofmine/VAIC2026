@@ -2,9 +2,32 @@ import type {
   AppUser,
   DocumentListResponse,
   FullDocument,
+  PrepPackKind,
+  PrepPackCache,
   RetrieveResponse,
 } from "../types/retrieval";
 import type { HistoryEntry } from "./chat-context";
+
+/** Read the cached prep-pack (summary/terms/questions) for a document (Slice 14a). */
+export async function getPrepPack(documentId: string): Promise<PrepPackCache> {
+  const config = useRuntimeConfig();
+  return await $fetch<PrepPackCache>(
+    `${config.retrievalApiHost}/api/documents/${documentId}/prep-pack`,
+  );
+}
+
+/** Store one computed prep-pack kind so future opens read it instead of re-calling Claude. */
+export async function savePrepPack(
+  documentId: string,
+  kind: PrepPackKind,
+  value: unknown,
+): Promise<void> {
+  const config = useRuntimeConfig();
+  await $fetch(`${config.retrievalApiHost}/api/documents/${documentId}/prep-pack`, {
+    method: "PUT",
+    body: { kind, value },
+  });
+}
 
 /** Upsert the GitHub user in Postgres (retrieval-api) and get our internal id (Slice 18). */
 export async function upsertUser(profile: {
