@@ -1,7 +1,14 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename } from "node:path";
+import { apiKeyHeaders, buildIngestForm } from "../utils/retrieval-http";
 
+/**
+ * Upload → forward to retrieval-api `POST /api/ingest` over HTTP.
+ *
+ * The UI runs serverless (Vercel Node) with no Python, so ingestion happens in the
+ * retrieval-api container (which co-locates rag-pipeline). retrieval-api returns as
+ * soon as the document row exists (status "processing"); the client then polls
+ * `/api/documents/{id}/status`.
+ */
 export default defineEventHandler(async (event) => {
   // Uploads are owned by the logged-in user (Slice 18); 401 if not signed in.
   const { user } = await requireUserSession(event);
@@ -30,27 +37,23 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  // Save under a unique temp dir keeping the ORIGINAL name (basename strips any
-  // path traversal). The dir is removed only when the background ingest exits.
   const safeName = basename(filePart.filename);
-  const dir = await mkdtemp(join(tmpdir(), "paperless-"));
-  const tmpPath = join(dir, safeName);
-  await writeFile(tmpPath, filePart.data);
+  const body = buildIngestForm(filePart.data, safeName, user.id);
 
-  const ragPipelineDir = resolve(process.cwd(), config.ingest.ragPipelineDir);
   try {
-    // Resolves as soon as the document row exists (id emitted early); ingestion
-    // continues in the background and updates documents.status. Cleanup on exit.
-    const documentId = await startIngestion(
-      tmpPath,
-      ragPipelineDir,
-      () => void rm(dir, { recursive: true, force: true }),
-      60_000,
-      user.id,
+    // retrieval-api returns early: { document_id, filename, status: "processing" }.
+    const res = await $fetch<{ document_id: string; status: string }>(
+      `${config.retrievalApiHost}/api/ingest`,
+      { method: "POST", body, headers: apiKeyHeaders(config.retrievalApiKey) },
     );
-    return { document_id: documentId, filename: safeName, doc_type: docType, status: "processing" };
+    return {
+      document_id: res.document_id,
+      filename: safeName,
+      doc_type: docType,
+      status: res.status,
+    };
   } catch (e) {
-    void rm(dir, { recursive: true, force: true });
-    throw createError({ statusCode: 500, statusMessage: "failed to start ingestion" });
+    // Don't leak the upstream error to the client (S1 hardening).
+    throw createError({ statusCode: 502, statusMessage: "ingestion service unavailable" });
   }
 });

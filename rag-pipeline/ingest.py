@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import Callable
 
 import psycopg
 
@@ -26,7 +27,11 @@ def ingest(
     embedder: Embedder,
     storage: BlobStorage | None = None,
     user_id: str | None = None,
+    on_created: Callable[[str], None] | None = None,
 ) -> str:
+    """Ingest a document. `on_created` (if given) fires with the document id the
+    instant the row exists — before the slow embedding step — so an async caller
+    can return the id early and poll status. It always fires exactly once."""
     p = Path(path)
     doc_type = p.suffix.lower().lstrip(".")
     storage = storage or BlobStorage()
@@ -35,6 +40,8 @@ def ingest(
     content_hash = sha256_file(p)
     existing = db.find_document_by_hash(conn, content_hash, user_id)
     if existing:
+        if on_created:
+            on_created(existing)
         print(f"document_id={existing}", flush=True)
         print("[ingest] reused existing document (dedup)", flush=True)
         return existing
@@ -58,9 +65,13 @@ def ingest(
         # (owner, content_hash) first (blocked by the partial unique index). Reuse it.
         conn.rollback()
         doc_id = db.find_document_by_hash(conn, content_hash, user_id)
+        if on_created:
+            on_created(doc_id)
         print(f"document_id={doc_id}", flush=True)
         print("[ingest] lost dedup race, reused existing (dedup)", flush=True)
         return doc_id
+    if on_created:
+        on_created(doc_id)
     print(f"document_id={doc_id}", flush=True)  # emit early for async upload
 
     try:
