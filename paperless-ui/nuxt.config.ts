@@ -2,7 +2,9 @@
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: false },
-  modules: ["@nuxt/ui"],
+  // Fixed port so the GitHub OAuth callback (…:3100/api/auth/github) always matches.
+  devServer: { port: 3100 },
+  modules: ["@nuxt/ui", "nuxt-auth-utils"],
   css: ["~/assets/css/main.css"],
   app: {
     head: { title: "Paperless Meetings" },
