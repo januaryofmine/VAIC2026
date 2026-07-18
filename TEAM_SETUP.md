@@ -60,6 +60,22 @@ Chi tiết kiến trúc: [ARCHITECTURE.md](ARCHITECTURE.md) · Deploy: [DEPLOY.m
 
 ---
 
+## D. 2 domain dev / main (đồng nghiệp tự build)
+
+| Branch | Domain | Cách deploy |
+|--------|--------|-------------|
+| `main` | **https://paperless-ui.vercel.app** | `git checkout main && ./deploy/deploy-ui.sh main` |
+| `dev`  | **https://paperless-ui-dev.vercel.app** | `git checkout dev && ./deploy/deploy-ui.sh dev` |
+
+**Chuẩn bị 1 lần / người:** được mời vào Vercel team `paperlessvaic` (bạn: Vercel → Team → Members → Invite) → chạy `vercel login`.
+
+> **Nâng cấp lên "push là tự build" (khuyến nghị):** hiện `buildmarketplacee-png` chỉ có quyền *push* (không admin) trên `januaryofmine/VAIC2026`, nên **chưa nối được Vercel ↔ GitHub tự động**. Để mỗi lần `git push` tự deploy:
+> 1. **Chủ repo `januaryofmine`** vào Vercel project `paperlessvaic/paperless-ui` → Settings → Git → **Connect** repo (cài Vercel GitHub App), đặt **Production Branch = main**.
+> 2. Xong: push `main` → cập nhật `paperless-ui.vercel.app`; push `dev` → Vercel tự tạo URL preview cho nhánh dev.
+> (Hoặc `januaryofmine` cấp **admin** cho `buildmarketplacee-png` để mình tự cấu hình.)
+
+---
+
 ## Hiện trạng hạ tầng (đã dựng)
 - **Supabase**: project `vaic-paperless` (Tokyo), pgvector + schema ✅
 - **Vercel UI**: https://paperless-ui.vercel.app ✅ (backend chờ chốt embedding provider)
