@@ -34,10 +34,11 @@ def retrieve_endpoint(
         anthropic_api_key=settings.anthropic_api_key,
     )
     top_k = req.top_k or settings.retrieval_top_k
-    # Two-stage retrieval: when the cross-encoder runs, stage 1 must hand it a WIDER
-    # pool than the caller asked for — the reranker can only promote a chunk that
-    # stage 1 actually returned. Fetching just top_k here would let it reorder the
+    # Two-stage retrieval (H1): when the cross-encoder runs, stage 1 must hand it a
+    # WIDER pool than the caller asked for — the reranker can only promote a chunk
+    # that stage 1 actually returned. Fetching just top_k would let it reorder the
     # same k rows and never rescue a correct chunk that ranked, say, 12th.
+    # max() guards the case retrieval_candidates < top_k.
     fetch_k = (
         max(top_k, settings.retrieval_candidates) if settings.reranker_enabled else top_k
     )

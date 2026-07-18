@@ -9,15 +9,7 @@ export default defineOAuthGitHubEventHandler({
       name: user.name || null,
       avatar_url: user.avatar_url,
     });
-    await setUserSession(event, {
-      user: {
-        id: appUser.id,
-        githubId: appUser.github_id,
-        username: appUser.username,
-        name: appUser.name,
-        avatarUrl: appUser.avatar_url,
-      },
-    });
+    await setUserSession(event, { user: toSessionUser(appUser) });
     return sendRedirect(event, "/");
   },
   onError(event, error) {

@@ -24,12 +24,15 @@ class Settings(BaseSettings):
     rrf_k: int = 60  # reciprocal rank fusion constant
     min_chunk_chars: int = 30  # skip noise chunks (headings/page numbers) at query time
 
-    # reranking (optional 2nd stage). Disabled by default → identical old behavior.
-    # When enabled: retrieve `retrieval_candidates` by cosine, then cross-encoder
-    # re-ranks down to retrieval_top_k. Point reranker_model at the fine-tuned dir.
+    # reranking (optional 2nd stage cross-encoder). Disabled by default → identical
+    # old behavior. When enabled: retrieve `retrieval_candidates` (wide over-fetch),
+    # then the cross-encoder re-ranks down to retrieval_top_k. Needs torch → HF Space
+    # only (never enable on the torch-free Vercel host). Point reranker_model at a
+    # fine-tuned dir (Slice 21) or a Hub repo for Vietnamese-legal quality, e.g.
+    # RERANKER_MODEL=jakethepinkpanther/bge-reranker-dienbien
     reranker_enabled: bool = False
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
-    retrieval_candidates: int = 30
+    retrieval_candidates: int = 30  # candidate pool fed to the reranker (H1 over-fetch)
 
     # reformulation (optional LLM query rewrite). "none" = passthrough (no LLM call).
     reformulation_provider: str = "none"  # "none" | "anthropic"
