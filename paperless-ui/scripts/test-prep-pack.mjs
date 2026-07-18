@@ -10,6 +10,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { flush, traceGeneration } from "./lib/langfuse.mjs";
+
+// Nhãn bước hiện tại, dùng làm tên generation trong Langfuse. main() đặt lại
+// trước mỗi giai đoạn để P50/P95 tách được theo summarize / terms / questions.
+let STEP = "prep-pack";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "../..");
@@ -71,6 +76,7 @@ async function chatOnce(model, prompt, maxTokens) {
     stream: false, // 9router streams SSE by default for some providers
     reasoning_effort: "none", // deepseek-v4 is a reasoning model; turn thinking OFF
   };
+  const startTime = new Date();
   const r = await fetch(`${BASE}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -78,17 +84,42 @@ async function chatOnce(model, prompt, maxTokens) {
   });
   const raw = await r.text();
   if (!r.ok) throw new Error(`9router ${r.status}: ${raw.slice(0, 300)}`);
+
+  let content = "";
+  let usage;
   // Handle both plain JSON and SSE ("data: {...}\n\ndata: [DONE]") responses.
   if (raw.startsWith("data:")) {
-    let content = "";
     for (const line of raw.split("\n")) {
       const s = line.replace(/^data:\s*/, "").trim();
       if (!s || s === "[DONE]") continue;
       try { content += JSON.parse(s).choices?.[0]?.delta?.content ?? ""; } catch {}
     }
-    return content;
+  } else {
+    const parsed = JSON.parse(raw);
+    content = parsed.choices?.[0]?.message?.content ?? "";
+    if (parsed.usage) {
+      usage = {
+        input: parsed.usage.prompt_tokens,
+        output: parsed.usage.completion_tokens,
+        total: parsed.usage.total_tokens,
+      };
+    }
   }
-  return JSON.parse(raw).choices?.[0]?.message?.content ?? "";
+
+  // AI monitoring: mỗi lời gọi thành 1 generation, gắn nhãn theo BƯỚC (STEP) để
+  // trace-stats.mjs tính được P50/P95 RIÊNG cho summarize / terms / questions —
+  // đúng thứ cần chứng minh ngân sách <60s. No-op nếu chưa cấu hình Langfuse.
+  traceGeneration({
+    name: STEP,
+    model,
+    input: prompt.slice(0, 2000),
+    output: content.slice(0, 2000),
+    usage,
+    startTime,
+    endTime: new Date(),
+    metadata: { maxTokens, step: STEP },
+  });
+  return content;
 }
 
 function parseJson(s, label = "") {
@@ -138,7 +169,9 @@ async function main() {
 
   // ── Deliverable #1: structured summary, timed ──
   let t0 = Date.now();
+  STEP = "summarize-map";
   const sumPartials = await mapPool(groups, CONCURRENCY, (g) => chat(MAP_MODEL, sumMap(g.join("\n\n")), MAP_TOKENS));
+  STEP = "summarize-reduce";
   const summaryRaw = await chat(REDUCE_MODEL, sumReduce(sumPartials), REDUCE_TOKENS, true);
   const summary = parseJson(summaryRaw, "summary");
   const sumSecs = ((Date.now() - t0) / 1000).toFixed(1);
@@ -153,7 +186,9 @@ async function main() {
 
   // ── Deliverable #2: >=10 explained terms, timed ──
   t0 = Date.now();
+  STEP = "terms-map";
   const termPartials = await mapPool(groups, CONCURRENCY, (g) => chat(MAP_MODEL, termMap(g.join("\n\n")), MAP_TOKENS));
+  STEP = "terms-reduce";
   const termsRaw = await chat(REDUCE_MODEL, termReduce(termPartials), REDUCE_TOKENS, true);
   const terms = parseJson(termsRaw, "terms").terms ?? [];
   const termSecs = ((Date.now() - t0) / 1000).toFixed(1);
@@ -164,7 +199,9 @@ async function main() {
 
   // ── Deliverable #3: >=5 critical-thinking questions, timed ──
   t0 = Date.now();
+  STEP = "questions-map";
   const qPartials = await mapPool(groups, CONCURRENCY, (g) => chat(MAP_MODEL, qMap(g.join("\n\n")), MAP_TOKENS));
+  STEP = "questions-reduce";
   const qRaw = await chat(REDUCE_MODEL, qReduce(qPartials), REDUCE_TOKENS, true);
   const questions = parseJson(qRaw, "questions").questions ?? [];
   const qSecs = ((Date.now() - t0) / 1000).toFixed(1);
@@ -172,6 +209,10 @@ async function main() {
   console.log("\n========== #3 CÂU HỎI GỢI Ý ==========");
   console.log(`⏱  ${qSecs}s  |  ${questions.length} câu hỏi (yêu cầu >=5 -> ${questions.length >= 5 ? "ĐẠT ✅" : "TRƯỢT ❌"})`);
   questions.slice(0, 6).forEach((q, i) => console.log(`  ${i + 1}. ${q}`));
+
+  // Bắt buộc: trace là fire-and-forget — không flush thì script thoát trước khi
+  // POST xong và số đo biến mất im lặng (đã dính đúng bẫy này một lần).
+  await flush();
 
   const ok = Number(sumSecs) < 60 && terms.length >= 10 && questions.length >= 5;
   console.log(`\n===== KẾT LUẬN: ${ok ? "CẢ 3 DELIVERABLE ĐẠT ✅" : "CẦN XEM LẠI ❌"} =====`);

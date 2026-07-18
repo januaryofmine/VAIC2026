@@ -139,7 +139,10 @@ if (MD) {
     `| **Tất cả** | **${all.n}** | **${(all.p50 / 1000).toFixed(2)}s** | **${(all.p95 / 1000).toFixed(2)}s** | **${(all.max / 1000).toFixed(2)}s** | **${all.tokIn}** | **${all.tokOut}** |`,
   );
   console.log(
-    `\n> Ngân sách < 60s: P95 = ${(all.p95 / 1000).toFixed(2)}s → ${all.p95 < BUDGET_MS ? "✅ ĐẠT" : "❌ VƯỢT"}`,
+    `\n> P95 **mỗi lời gọi LLM** = ${(all.p95 / 1000).toFixed(2)}s.` +
+      ` Lưu ý: ngân sách "< 60s" của đề bài là **end-to-end** cho cả bước tóm tắt` +
+      ` (các call map chạy song song rồi mới reduce), KHÔNG phải latency một call.` +
+      ` Số end-to-end lấy từ \`test-prep-pack.mjs\`.`,
   );
 } else {
   console.log(`nguồn: ${FILE ? `file ${FILE}` : "Langfuse API"} | ${rows.length} generation\n`);
@@ -153,6 +156,7 @@ if (MD) {
     `\nTẤT CẢ        n=${String(all.n).padStart(3)}  P50=${(all.p50 / 1000).toFixed(2)}s  P95=${(all.p95 / 1000).toFixed(2)}s  max=${(all.max / 1000).toFixed(2)}s  tok ${all.tokIn}/${all.tokOut}`,
   );
   console.log(
-    `Ngân sách <60s: P95=${(all.p95 / 1000).toFixed(2)}s → ${all.p95 < BUDGET_MS ? "ĐẠT" : "VƯỢT"}`,
+    `P95 mỗi lời gọi LLM = ${(all.p95 / 1000).toFixed(2)}s ` +
+      `(ngân sách <60s của đề bài là end-to-end cả bước, không phải 1 call — xem test-prep-pack.mjs)`,
   );
 }
