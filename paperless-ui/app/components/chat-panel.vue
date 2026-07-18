@@ -6,6 +6,7 @@ import type { Source } from "~/utils/citations";
 const props = defineProps<{ documentId: string }>();
 
 const { messages, status, send } = useDocChat(props.documentId);
+const { requestJump } = useDocJump();
 const input = ref("");
 const busy = computed(() => status.value === "submitted" || status.value === "streaming");
 
@@ -67,6 +68,9 @@ function sourcesOf(m: UIMessage): Source[] {
               variant="soft"
               size="sm"
               icon="i-lucide-quote"
+              :class="s.page != null ? 'cursor-pointer hover:bg-[var(--ui-bg-accented)]' : ''"
+              :title="s.page != null ? 'Xem trong tài liệu' : undefined"
+              @click="s.page != null && requestJump(s)"
             >
               {{ citationLabel(s) }}
             </UBadge>

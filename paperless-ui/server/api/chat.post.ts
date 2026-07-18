@@ -52,6 +52,7 @@ export default defineEventHandler(async (event) => {
         position: c.position,
         page: c.page,
         section: c.section,
+        text: c.text,
       }));
 
       // Surface the search plan (the sub-queries the retriever fanned out on) so the
