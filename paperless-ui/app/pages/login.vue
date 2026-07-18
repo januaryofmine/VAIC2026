@@ -35,6 +35,21 @@ const hasError = computed(() => route.query.error === "github_oauth_error");
           external
           block
         />
+        <div class="flex flex-col gap-1">
+          <UButton
+            to="/api/auth/test"
+            icon="i-lucide-user-round"
+            label="Login as Test Account"
+            color="neutral"
+            variant="subtle"
+            size="lg"
+            external
+            block
+          />
+          <p class="text-center text-xs text-[var(--ui-text-muted)]">
+            Tài khoản dùng chung để thử nhanh — mọi người thấy chung tài liệu.
+          </p>
+        </div>
         <UAlert
           v-if="hasError"
           title="Đăng nhập thất bại"
