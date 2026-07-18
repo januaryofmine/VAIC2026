@@ -8,6 +8,9 @@ from fastapi.responses import FileResponse
 
 from app.deps import get_db
 from app.models import (
+    ChatMessage,
+    ChatMessageAppendRequest,
+    ChatMessagesResponse,
     DocumentChunk,
     DocumentListItem,
     DocumentListResponse,
@@ -16,6 +19,7 @@ from app.models import (
     PrepPackResponse,
     PrepPackUpsertRequest,
 )
+from app.services.chat import append_chat_message, list_chat_messages
 from app.services.documents import (
     fetch_document_file,
     fetch_document_status,
@@ -121,6 +125,25 @@ def put_document_prep_pack(
         upsert_prep_pack(conn, str(document_id), body.kind, body.value)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@router.get("/documents/{document_id}/chat/messages", response_model=ChatMessagesResponse)
+def get_chat_messages(
+    document_id: UUID,
+    conn: psycopg.Connection = Depends(get_db),
+) -> ChatMessagesResponse:
+    rows = list_chat_messages(conn, str(document_id))
+    return ChatMessagesResponse(messages=[ChatMessage(**r) for r in rows])
+
+
+@router.post("/documents/{document_id}/chat/messages")
+def post_chat_message(
+    document_id: UUID,
+    body: ChatMessageAppendRequest,
+    conn: psycopg.Connection = Depends(get_db),
+) -> dict:
+    append_chat_message(conn, str(document_id), body.id, body.role, body.parts, body.metadata)
     return {"ok": True}
 
 

@@ -57,3 +57,11 @@ export interface PrepPackCache {
   terms: unknown | null;
   questions: unknown | null;
 }
+
+/** A persisted chat message (AI-SDK UIMessage shape) for chat-history (Slice 14b). */
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  parts: unknown;
+  metadata?: unknown;
+}

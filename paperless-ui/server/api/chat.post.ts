@@ -64,6 +64,21 @@ export default defineEventHandler(async (event) => {
         temperature: config.ai.temperature,
         system,
         messages: await convertToModelMessages(recent),
+        // Persist the whole turn (question + answer with citations) only once streaming
+        // completes, so a failed/interrupted stream never leaves an orphan user message.
+        // Best-effort — a save failure never breaks the reply.
+        onFinish: async ({ text }) => {
+          try {
+            await appendChatMessage(document_id, {
+              id: lastUserMessage.id,
+              role: "user",
+              parts: lastUserMessage.parts,
+            });
+            await appendChatMessage(document_id, buildAssistantMessage(text, { sources, plan }));
+          } catch (e) {
+            console.error("[chat] save messages failed:", e);
+          }
+        },
       });
 
       writer.merge(

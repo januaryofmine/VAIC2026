@@ -87,6 +87,9 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
 
 CREATE INDEX IF NOT EXISTS chat_sessions_document_idx
   ON chat_sessions (document_id, updated_at DESC);
+-- One chat session per document (Slice 14b): get-or-create is race-safe via this.
+CREATE UNIQUE INDEX IF NOT EXISTS chat_sessions_document_uniq
+  ON chat_sessions (document_id) WHERE document_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS chat_messages (
   id TEXT PRIMARY KEY,
