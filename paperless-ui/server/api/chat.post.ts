@@ -84,6 +84,14 @@ export default defineEventHandler(async (event) => {
         },
       });
 
+      // Force the generation to finish server-side so onFinish (which persists the turn)
+      // always runs — even if the client disconnects mid-stream, which would otherwise
+      // stall generation and lose the whole turn. On serverless (Vercel) waitUntil keeps
+      // the function alive until the save completes; it is undefined on the local
+      // node-server preset, hence the optional call.
+      const finished = result.consumeStream();
+      event.context.waitUntil?.(finished);
+
       writer.merge(
         result.toUIMessageStream({
           messageMetadata: ({ part }) => {
