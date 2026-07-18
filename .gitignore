@@ -40,3 +40,6 @@ docs/Tasks/
 
 # deploy secrets (Supabase pw, tokens, DATABASE_URL cloud) — never commit
 deploy/.secrets
+
+# Playwright MCP local test artifacts
+.playwright-mcp/

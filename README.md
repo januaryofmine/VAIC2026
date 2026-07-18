@@ -37,6 +37,9 @@ Single monorepo.
 
 #### Updates
 
+- **Citation click-to-jump + PDF highlight**: clicking a source chip scrolls the PDF pane to that page, flashes it gold for 1.2s, and fuzzy-matches the cited chunk against PDF.js text-layer spans to highlight the exact lines ([`1dad9c8`](https://github.com/januaryofmine/VAIC2026/commit/1dad9c8)).
+- **Ownership guard**: every BFF route checks the sealed session, then verifies the caller owns the document via a lightweight owner lookup. No session → **401**; a missing document or one owned by someone else both return **404 (never 403)** so document IDs can't be enumerated ([`5e7da62`](https://github.com/januaryofmine/VAIC2026/commit/5e7da62)).
+- **Cross-encoder reranker**: an optional `BAAI/bge-reranker-v2-m3` pass. Stage-1 over-fetches a wide candidate pool (`retrieval_candidates=30`, the H1 pattern) so the cross-encoder can lift a chunk that ranked low, then trims back to `top_k`. ([`83c960d`](https://github.com/januaryofmine/VAIC2026/commit/83c960d)).
 - **Shared test-account login**: one-click demo sign-in (no OAuth), so everyone lands on the same owner and shares one document scope ([`73d9af0`](https://github.com/januaryofmine/VAIC2026/commit/73d9af0)).
 - **Two-pane document reader**: the original PDF rendered with `vue-pdf-embed` (PDF.js) next to a four-tab prep-pack (summary · terms · questions · Q&A) ([`9e7bc63`](https://github.com/januaryofmine/VAIC2026/commit/9e7bc63)).
 - **Direct browser → backend upload**: the BFF mints a short-lived **HMAC-SHA256** token (`<userId>.<exp>.<hmac>`, constant-time verify, identical bytes in Node & Python) so large files upload straight to the API and skip Vercel's 4.5 MB function-body limit, while the API key stays server-side ([`7546d99`](https://github.com/januaryofmine/VAIC2026/commit/7546d99)).
