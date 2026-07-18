@@ -65,9 +65,17 @@ async function loadFromLangfuse() {
     process.exit(1);
   }
   const auth = Buffer.from(`${pk}:${sk}`).toString("base64");
-  const res = await fetch(`${base}/api/public/observations?limit=${LIMIT}`, {
-    headers: { Authorization: `Basic ${auth}` },
-  });
+  let res;
+  try {
+    res = await fetch(`${base}/api/public/observations?limit=${LIMIT}`, {
+      headers: { Authorization: `Basic ${auth}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (e) {
+    // Mạng chập/timeout: báo gọn thay vì ném stack trace undici khó hiểu.
+    console.error(`Không gọi được Langfuse (${e.name}). Thử lại, hoặc dùng --file để đọc sink cục bộ.`);
+    process.exit(1);
+  }
   if (!res.ok) {
     console.error(`Langfuse API lỗi HTTP ${res.status}`);
     process.exit(1);
