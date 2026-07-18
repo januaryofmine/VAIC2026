@@ -20,6 +20,8 @@ export default defineEventHandler(async (event) => {
   if (!messages?.length) {
     throw createError({ statusCode: 400, statusMessage: "messages are required" });
   }
+  // Authorize before any retrieval or LLM call: signed in AND owns this document.
+  await requireDocumentAccess(event, document_id);
 
   const config = useRuntimeConfig();
 

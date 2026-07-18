@@ -32,6 +32,11 @@ class DocumentStatusResponse(BaseModel):
     chunk_count: int
 
 
+class DocumentOwnerResponse(BaseModel):
+    document_id: str
+    user_id: str | None  # NULL for pre-Slice-18 documents; the BFF treats null as "deny"
+
+
 class UserUpsertRequest(BaseModel):
     github_id: int
     username: str

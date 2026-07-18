@@ -14,6 +14,7 @@ from app.models import (
     DocumentChunk,
     DocumentListItem,
     DocumentListResponse,
+    DocumentOwnerResponse,
     DocumentStatusResponse,
     FullDocumentResponse,
     PrepPackResponse,
@@ -22,6 +23,7 @@ from app.models import (
 from app.services.chat import append_chat_message, list_chat_messages
 from app.services.documents import (
     fetch_document_file,
+    fetch_document_owner,
     fetch_document_status,
     fetch_full_document,
     list_documents,
@@ -80,6 +82,19 @@ def get_document_status(
     if row is None:
         raise HTTPException(status_code=404, detail="document not found")
     return DocumentStatusResponse(**row)
+
+
+@router.get("/documents/{document_id}/owner", response_model=DocumentOwnerResponse)
+def get_document_owner(
+    document_id: UUID,
+    conn: psycopg.Connection = Depends(get_db),
+) -> DocumentOwnerResponse:
+    # Owner-only lookup so the BFF can authorize a request before any data-serving
+    # endpoint runs. Returns just the owner id (or null); never document content.
+    row = fetch_document_owner(conn, str(document_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    return DocumentOwnerResponse(document_id=str(document_id), user_id=row["user_id"])
 
 
 @router.get("/documents/{document_id}/file")

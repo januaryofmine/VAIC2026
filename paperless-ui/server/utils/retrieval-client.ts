@@ -2,6 +2,7 @@ import type {
   AppUser,
   ChatMessage,
   DocumentListResponse,
+  DocumentOwner,
   FullDocument,
   PrepPackKind,
   PrepPackCache,
@@ -87,6 +88,15 @@ export async function fetchFullDocument(documentId: string): Promise<FullDocumen
   const config = useRuntimeConfig();
   return await $fetch<FullDocument>(
     `${config.retrievalApiHost}/api/documents/${documentId}/full`,
+    { headers: apiKeyHeaders(config.retrievalApiKey) },
+  );
+}
+
+/** Resolve a document's owner id (for the BFF authorization guard). 404s if absent. */
+export async function fetchDocumentOwner(documentId: string): Promise<DocumentOwner> {
+  const config = useRuntimeConfig();
+  return await $fetch<DocumentOwner>(
+    `${config.retrievalApiHost}/api/documents/${documentId}/owner`,
     { headers: apiKeyHeaders(config.retrievalApiKey) },
   );
 }

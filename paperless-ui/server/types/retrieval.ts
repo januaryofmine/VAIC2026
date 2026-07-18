@@ -16,6 +16,11 @@ export interface FullDocument {
   chunks: DocumentChunk[];
 }
 
+export interface DocumentOwner {
+  document_id: string;
+  user_id: string | null; // null for pre-Slice-18 documents
+}
+
 export interface RetrieveChunk extends DocumentChunk {
   score: number;
 }
