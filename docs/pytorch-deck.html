@@ -1,0 +1,636 @@
+<title>Reranker PyTorch — Deck tập thuyết trình</title>
+
+<style>
+  :root {
+    --flame: #EE4C2C;
+    --flame-ink: #C0341A;
+    --flame-soft: #FDEDE8;
+    --teal: #0E7C74;
+    --ink: #131A22;
+    --ink-2: #4B5866;
+    --ink-3: #7A8794;
+    --line: #DCE3EA;
+    --paper: #F5F7F9;
+    --card: #FFFFFF;
+    --shadow: 0 1px 2px rgba(19, 26, 34, .06), 0 8px 24px rgba(19, 26, 34, .06);
+
+    --display: Cambria, Georgia, "Times New Roman", serif;
+    --body: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: "Cascadia Mono", Consolas, "SF Mono", ui-monospace, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --flame: #FF6B4A;
+      --flame-ink: #FFA588;
+      --flame-soft: #2C1711;
+      --teal: #3FB8AC;
+      --ink: #E7EDF3;
+      --ink-2: #9AA7B4;
+      --ink-3: #6D7B89;
+      --line: #26313B;
+      --paper: #0D1218;
+      --card: #151C24;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --flame: #FF6B4A;
+    --flame-ink: #FFA588;
+    --flame-soft: #2C1711;
+    --teal: #3FB8AC;
+    --ink: #E7EDF3;
+    --ink-2: #9AA7B4;
+    --ink-3: #6D7B89;
+    --line: #26313B;
+    --paper: #0D1218;
+    --card: #151C24;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .3);
+  }
+  :root[data-theme="light"] {
+    --flame: #EE4C2C;
+    --flame-ink: #C0341A;
+    --flame-soft: #FDEDE8;
+    --teal: #0E7C74;
+    --ink: #131A22;
+    --ink-2: #4B5866;
+    --ink-3: #7A8794;
+    --line: #DCE3EA;
+    --paper: #F5F7F9;
+    --card: #FFFFFF;
+    --shadow: 0 1px 2px rgba(19, 26, 34, .06), 0 8px 24px rgba(19, 26, 34, .06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── chrome ─────────────────────────────────────────── */
+  .bar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 20px;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand {
+    display: flex; align-items: center; gap: 9px;
+    font-weight: 700; letter-spacing: .01em; font-size: .95rem;
+  }
+  .flame-dot {
+    width: 11px; height: 11px; border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg); background: var(--flame); flex: none;
+  }
+  .bar-spacer { flex: 1; }
+  .counter {
+    font-family: var(--mono); font-size: .82rem; color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .modes { display: flex; gap: 2px; padding: 3px; background: var(--line); border-radius: 999px; }
+  .mode {
+    border: 0; cursor: pointer; border-radius: 999px;
+    padding: 6px 14px; font: inherit; font-size: .82rem; font-weight: 600;
+    background: transparent; color: var(--ink-2);
+  }
+  .mode[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+  .mode:focus-visible, .navbtn:focus-visible { outline: 2px solid var(--flame); outline-offset: 2px; }
+
+  .rail { height: 2px; background: var(--line); }
+  .rail-fill { height: 100%; background: var(--flame); transition: width .25s ease; }
+
+  /* ── stage ──────────────────────────────────────────── */
+  main { max-width: 1000px; margin: 0 auto; padding: 34px 20px 120px; }
+  .slide { display: none; }
+  .slide.on { display: block; animation: rise .28s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .slide.on { animation: none; }
+    .rail-fill { transition: none; }
+  }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: .74rem; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--flame-ink); margin-bottom: 14px;
+  }
+  h1 {
+    font-family: var(--display); font-weight: 700; text-wrap: balance;
+    font-size: clamp(2rem, 5vw, 3.1rem); line-height: 1.12; margin: 0 0 16px;
+    letter-spacing: -.015em;
+  }
+  h2 {
+    font-family: var(--display); font-weight: 700; text-wrap: balance;
+    font-size: clamp(1.5rem, 3.4vw, 2.1rem); line-height: 1.2; margin: 0 0 18px;
+    letter-spacing: -.01em;
+  }
+  .lede { font-size: 1.12rem; color: var(--ink-2); max-width: 62ch; margin: 0 0 26px; }
+  p { max-width: 66ch; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 22px 24px; box-shadow: var(--shadow);
+  }
+  .grid { display: grid; gap: 16px; }
+  .grid.two { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .grid.three { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+
+  .k { font-family: var(--display); font-size: 2.4rem; font-weight: 700; line-height: 1; }
+  .k.good { color: var(--teal); }
+  .k.bad { color: var(--flame); }
+  .k-label { font-size: .88rem; color: var(--ink-2); margin-top: 6px; }
+
+  ul.clean { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  ul.clean li { display: flex; gap: 12px; align-items: flex-start; }
+  ul.clean li::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--flame); margin-top: .58em; flex: none;
+  }
+
+  ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 14px; }
+  ol.steps li { counter-increment: s; display: flex; gap: 14px; align-items: flex-start; }
+  ol.steps li::before {
+    content: counter(s); font-family: var(--mono); font-size: .78rem; font-weight: 700;
+    color: var(--flame-ink); background: var(--flame-soft);
+    width: 24px; height: 24px; border-radius: 6px; flex: none;
+    display: grid; place-items: center; margin-top: .12em;
+  }
+
+  .tblwrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  th { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); font-weight: 600; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.win td { background: var(--flame-soft); font-weight: 700; }
+  tr.win td:first-child { border-left: 3px solid var(--flame); }
+
+  pre {
+    margin: 0; overflow-x: auto; background: var(--card);
+    border: 1px solid var(--line); border-radius: 10px; padding: 18px;
+    font-family: var(--mono); font-size: .84rem; line-height: 1.75;
+  }
+  code { font-family: var(--mono); }
+  .cmt { color: var(--ink-3); }
+  .kw { color: var(--flame-ink); font-weight: 600; }
+
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: .92rem; }
+  .node {
+    border: 1px solid var(--line); background: var(--card);
+    border-radius: 8px; padding: 9px 13px;
+  }
+  .node.hot { border-color: var(--flame); background: var(--flame-soft); font-weight: 600; }
+  .arr { color: var(--ink-3); font-family: var(--mono); }
+
+  /* ── notes (learn mode) ─────────────────────────────── */
+  .notes { margin-top: 26px; display: grid; gap: 14px; }
+  body[data-mode="present"] .notes { display: none; }
+  .note {
+    border-left: 3px solid var(--flame); background: var(--card);
+    border-radius: 0 10px 10px 0; padding: 16px 20px;
+  }
+  .note.deep { border-left-color: var(--teal); }
+  .note h3 {
+    margin: 0 0 8px; font-size: .76rem; letter-spacing: .1em; text-transform: uppercase;
+    font-family: var(--mono); color: var(--ink-3); font-weight: 600;
+  }
+  .note p { margin: 0 0 10px; }
+  .note p:last-child { margin-bottom: 0; }
+  .say { font-size: 1.02rem; }
+  .say em { font-style: normal; background: var(--flame-soft); padding: 1px 5px; border-radius: 4px; }
+
+  .qa { display: grid; gap: 14px; }
+  .qa details {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 18px;
+  }
+  .qa summary { cursor: pointer; font-weight: 650; }
+  .qa summary::marker { color: var(--flame); }
+  .qa details[open] summary { margin-bottom: 10px; }
+  .qa p { margin: 0; color: var(--ink-2); }
+
+  /* ── nav ────────────────────────────────────────────── */
+  .nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    padding: 14px 20px;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line);
+  }
+  .navbtn {
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    border-radius: 8px; padding: 9px 18px; font: inherit; font-weight: 600;
+    font-size: .9rem; cursor: pointer;
+  }
+  .navbtn:hover:not(:disabled) { border-color: var(--flame); color: var(--flame-ink); }
+  .navbtn:disabled { opacity: .38; cursor: default; }
+  .hint { font-size: .78rem; color: var(--ink-3); font-family: var(--mono); }
+  @media (max-width: 620px) { .hint { display: none; } }
+</style>
+
+<div class="bar">
+  <div class="brand"><span class="flame-dot"></span> Reranker PyTorch</div>
+  <div class="bar-spacer"></div>
+  <div class="modes" role="group" aria-label="Chế độ">
+    <button class="mode" id="m-learn" aria-pressed="true">Học</button>
+    <button class="mode" id="m-present" aria-pressed="false">Trình bày</button>
+  </div>
+  <div class="counter"><span id="cur">1</span>/<span id="tot">13</span></div>
+</div>
+<div class="rail"><div class="rail-fill" id="rail"></div></div>
+
+<main id="stage">
+
+  <!-- 1 ─────────────────────────────────────────────── -->
+  <section class="slide on">
+    <div class="eyebrow">VAIC2026 · Thành phần học máy tự huấn luyện</div>
+    <h1>Chúng tôi không chỉ gọi API.<br>Chúng tôi tự huấn luyện một model.</h1>
+    <p class="lede">Một <strong>cross-encoder reranker</strong> viết bằng PyTorch, huấn luyện trên
+      chính văn bản pháp quy tỉnh Điện Biên — để mỗi câu trả lời trích dẫn đúng trang, đúng Điều.</p>
+    <div class="grid three">
+      <div class="card"><div class="k good">0.89</div><div class="k-label">Recall@1 trên tập held-out<br>(gốc: 0.72)</div></div>
+      <div class="card"><div class="k">568M</div><div class="k-label">tham số, fine-tune bằng LoRA</div></div>
+      <div class="card"><div class="k">$0</div><div class="k-label">chi phí huấn luyện (Kaggle GPU free)</div></div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Điểm khác biệt kỹ thuật của chúng tôi nằm ở đây:
+        phần lớn các đội sẽ ghép RAG rồi gọi API. Chúng tôi <em>tự huấn luyện một model bằng PyTorch</em>
+        và đặt nó vào đúng chỗ đau nhất của bài toán — độ chính xác của trích dẫn."</p></div>
+      <div class="note deep"><h3>Hiểu trước đã</h3><p>"Reranker" = model chấm điểm lại. Hệ thống tìm ra 30 đoạn
+        có thể liên quan, reranker đọc kỹ từng đoạn cùng câu hỏi rồi xếp lại thứ tự, giữ 5 đoạn tốt nhất.
+        Nói ngắn gọn khi thuyết trình: <strong>"vòng sơ loại rồi tới vòng chung kết"</strong>.</p></div>
+    </div>
+  </section>
+
+  <!-- 2 ─────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Vấn đề</div>
+    <h2>Trích dẫn sai một lần là mất niềm tin</h2>
+    <p class="lede">Cán bộ hỏi "điều kiện được hỗ trợ là gì?" — nếu hệ thống dẫn nhầm sang Điều khác,
+      họ sẽ không bao giờ dám dùng nó trong cuộc họp nữa.</p>
+    <div class="grid two">
+      <div class="card">
+        <strong>Tìm kiếm bằng vector (e5) là chưa đủ</strong>
+        <p style="color:var(--ink-2);margin:.6em 0 0">Nó so <em>ý nghĩa tổng thể</em> của câu hỏi với từng
+          đoạn — nhanh, nhưng dễ nhầm giữa các đoạn na ná nhau. Văn bản pháp quy thì đầy đoạn na ná.</p>
+      </div>
+      <div class="card">
+        <strong>Đoạn đúng thường nằm ở hạng 2–5</strong>
+        <p style="color:var(--ink-2);margin:.6em 0 0">Đo thực tế: chỉ <strong>72%</strong> số câu hỏi có
+          đoạn đúng ở vị trí số 1. Nghĩa là gần 1/3 số lần, thứ đập vào mắt cán bộ đầu tiên là thứ sai.</p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Với văn bản pháp lý, sai trích dẫn không phải lỗi nhỏ.
+        Đo trên hệ thống chỉ dùng tìm kiếm vector, <em>chỉ 72% câu hỏi có đoạn đúng ở vị trí số một</em>.
+        Đó là con số chúng tôi phải nâng lên."</p></div>
+    </div>
+  </section>
+
+  <!-- 3 ─────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Kiến trúc</div>
+    <h2>Hai tầng: tìm rộng, rồi chấm kỹ</h2>
+    <div class="card" style="margin-bottom:18px">
+      <div class="flow">
+        <span class="node">Câu hỏi</span><span class="arr">→</span>
+        <span class="node">e5 embedding</span><span class="arr">→</span>
+        <span class="node">pgvector: 30 đoạn</span><span class="arr">→</span>
+        <span class="node hot">RERANKER (PyTorch)</span><span class="arr">→</span>
+        <span class="node">5 đoạn + trang/Điều</span>
+      </div>
+    </div>
+    <ul class="clean">
+      <li><strong>Tầng 1 — e5 (bi-encoder):</strong> mã hoá câu hỏi và các đoạn thành vector <em>riêng biệt</em>,
+        so bằng khoảng cách. Rất nhanh, quét được cả tài liệu 60 trang.</li>
+      <li><strong>Tầng 2 — reranker (cross-encoder):</strong> đọc câu hỏi và đoạn văn <em>cùng lúc, trong một lượt</em>,
+        nên hiểu được quan hệ giữa chúng. Chính xác hơn hẳn, nhưng chậm → chỉ dùng cho 30 ứng viên.</li>
+    </ul>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Đây là kiến trúc hai tầng chuẩn của hệ thống tìm kiếm hiện đại.
+        Tầng một quét rộng cho nhanh. Tầng hai — model PyTorch của chúng tôi — <em>đọc câu hỏi và đoạn văn cùng một lúc</em>
+        nên phân biệt được những đoạn na ná nhau."</p></div>
+      <div class="note deep"><h3>Nếu giám khảo hỏi sâu</h3><p>Bi-encoder giống như hai người đọc hai tài liệu ở hai phòng
+        rồi mô tả lại cho nhau. Cross-encoder là một người cầm cả hai tờ giấy đọc song song — thấy được từ nào ứng với từ nào.
+        Đổi lại, phải chạy lại model cho <em>từng cặp</em>, nên đắt; vì vậy mới cần tầng 1 lọc trước.</p></div>
+    </div>
+  </section>
+
+  <!-- 4 ─────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Nền tảng</div>
+    <h2>PyTorch dùng để làm gì ở đây?</h2>
+    <p class="lede">Gọi API là <em>dùng</em> model người khác đã huấn luyện. PyTorch là công cụ để
+      <strong>tự huấn luyện</strong> — tự dạy model bằng dữ liệu của mình.</p>
+    <div class="grid two">
+      <div class="card"><strong>PyTorch cho ta ba thứ</strong>
+        <ul class="clean" style="margin-top:12px">
+          <li>Biểu diễn dữ liệu thành <strong>tensor</strong> (mảng số nhiều chiều) chạy được trên GPU</li>
+          <li>Tự động tính <strong>đạo hàm</strong> — biết phải chỉnh tham số theo hướng nào</li>
+          <li>Bộ <strong>optimizer</strong> để cập nhật hàng trăm triệu tham số một cách ổn định</li>
+        </ul>
+      </div>
+      <div class="card"><strong>Chúng tôi đã tự viết</strong>
+        <ul class="clean" style="margin-top:12px">
+          <li>Vòng lặp huấn luyện thuần (không dùng Trainer đóng gói sẵn)</li>
+          <li>Mixed precision (AMP) + gradient checkpointing để vừa GPU 16GB</li>
+          <li>Gradient accumulation + LoRA + bộ đo Recall/MRR/nDCG</li>
+        </ul>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Nói cho rõ ranh giới: gọi API là dùng model người khác huấn luyện.
+        PyTorch là thứ để <em>tự huấn luyện</em>. Và chúng tôi tự viết vòng lặp huấn luyện chứ không dùng thư viện đóng gói sẵn —
+        để kiểm soát được từng bước."</p></div>
+      <div class="note deep"><h3>Hiểu trước đã</h3><p><strong>Tensor</strong> = mảng số. Câu chữ được chuyển thành số để tính toán.
+        <strong>Đạo hàm (gradient)</strong> = "nếu chỉnh tham số này lên một chút thì model sai nhiều hơn hay ít hơn?" —
+        PyTorch tính giúp ta điều đó cho <em>mọi</em> tham số cùng lúc. Đó là lý do huấn luyện được model lớn.</p></div>
+    </div>
+  </section>
+
+  <!-- 5 ─────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Trái tim kỹ thuật</div>
+    <h2>Vòng lặp huấn luyện — 5 bước lặp lại</h2>
+    <pre><code><span class="cmt"># mỗi lần lấy ra một lô (batch) gồm câu hỏi + đoạn văn + nhãn đúng/sai</span>
+<span class="kw">for</span> enc, labels <span class="kw">in</span> loader:
+    <span class="cmt">① Đưa dữ liệu qua model → dự đoán điểm liên quan</span>
+    logits = model(**enc).logits.squeeze(-1)
+
+    <span class="cmt">② So dự đoán với đáp án → ra "độ sai" (loss)</span>
+    loss = loss_fn(logits, labels) / accum
+
+    <span class="cmt">③ Lan truyền ngược: tính xem mỗi tham số góp bao nhiêu vào cái sai đó</span>
+    scaler.scale(loss).backward()
+
+    <span class="kw">if</span> (bidx + 1) % accum == 0:
+        <span class="cmt">④ Chỉnh tham số theo hướng giảm sai</span>
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        scaler.step(optim); scaler.update()
+        sched.step()
+        <span class="cmt">⑤ Xoá gradient cũ, lặp lại với lô tiếp theo</span>
+        optim.zero_grad(set_to_none=<span class="kw">True</span>)</code></pre>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Đây là toàn bộ việc huấn luyện, gói trong năm bước lặp đi lặp lại:
+        <em>dự đoán → đo sai → truy ngược cái sai → chỉnh tham số → lặp</em>. Model xem vài trăm lượt như vậy
+        là học được cách nhận ra đoạn văn nào thật sự trả lời câu hỏi."</p></div>
+      <div class="note deep"><h3>Ba chi tiết dễ bị hỏi</h3>
+        <p><strong>clip_grad_norm_</strong> — chặn bước chỉnh quá lớn làm model "văng" khỏi vùng tốt.</p>
+        <p><strong>scaler (AMP)</strong> — tính bằng số thực 16-bit cho nhanh và nhẹ bộ nhớ, nhưng nhân hệ số
+          để số nhỏ không bị làm tròn về 0.</p>
+        <p><strong>accum</strong> — gom gradient của 4 lô nhỏ rồi mới chỉnh một lần, để có hiệu quả của lô lớn
+          mà không tràn bộ nhớ GPU.</p></div>
+    </div>
+  </section>
+
+  <!-- 6 ─────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Kỹ thuật then chốt</div>
+    <h2>LoRA — dạy thêm mà không làm hỏng cái đã giỏi</h2>
+    <div class="grid two">
+      <div class="card">
+        <strong>Vấn đề của fine-tune toàn bộ</strong>
+        <p style="color:var(--ink-2);margin:.6em 0 0">Model gốc đã rất mạnh nhờ học từ khối dữ liệu khổng lồ.
+          Nếu chỉnh cả 568 triệu tham số bằng vài chục ví dụ của mình, nó <strong>quên</strong> phần lớn
+          những gì đã biết. Đây là điều thật sự đã xảy ra với chúng tôi.</p>
+      </div>
+      <div class="card">
+        <strong>Cách LoRA giải quyết</strong>
+        <p style="color:var(--ink-2);margin:.6em 0 0"><strong>Đóng băng</strong> toàn bộ model gốc, chỉ chèn thêm
+          vài ma trận nhỏ và chỉ huấn luyện chúng. Kiến thức cũ được giữ nguyên vẹn, phần mới chỉ là lớp
+          điều chỉnh mỏng đặt lên trên.</p>
+      </div>
+    </div>
+    <p style="margin-top:20px"><strong>Ví von khi thuyết trình:</strong> thay vì viết lại cả cuốn từ điển,
+      ta kẹp thêm vài tờ ghi chú vào đúng những trang cần dùng cho lĩnh vực của mình.</p>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"LoRA — Low-Rank Adaptation. Thay vì sửa cả model,
+        chúng tôi đóng băng nó lại và chỉ học thêm vài ma trận nhỏ. <em>Như kẹp thêm ghi chú vào cuốn từ điển
+        thay vì viết lại cả cuốn.</em> Nhờ vậy model giữ được năng lực gốc mà vẫn học được đặc thù văn bản Điện Biên."</p></div>
+    </div>
+  </section>
+
+  <!-- 7 ─────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Dữ liệu</div>
+    <h2>Tự dựng bộ dữ liệu huấn luyện từ con số 0</h2>
+    <ol class="steps">
+      <li><strong>Thu thập</strong> — tải văn bản pháp quy công khai từ Công báo tỉnh Điện Biên (nghị quyết, quyết định).</li>
+      <li><strong>Cắt đoạn</strong> — 10 văn bản → 198 đoạn, mỗi đoạn <em>giữ nguyên số trang và số Điều</em> để về sau trích dẫn được.</li>
+      <li><strong>Sinh câu hỏi</strong> — 53 câu hỏi tiếng Việt tự nhiên, mỗi câu gắn với đúng một đoạn chứa câu trả lời.</li>
+      <li><strong>Đào ví dụ khó</strong> — dùng BM25 lấy những đoạn <em>trông rất giống</em> nhưng sai, làm ví dụ phủ định. Model chỉ giỏi lên khi phải phân biệt ca khó.</li>
+      <li><strong>Chia train/test chống rò rỉ</strong> — 35 câu huấn luyện / 18 câu kiểm tra, nhóm theo đoạn đáp án để không câu nào ở tập test dùng chung đáp án với tập train.</li>
+    </ol>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Không có sẵn bộ dữ liệu cho bài này nên chúng tôi tự dựng.
+        Điểm tôi muốn nhấn: <em>ví dụ phủ định phải là ví dụ khó</em> — những đoạn trông rất giống nhưng sai —
+        và tập kiểm tra được tách sạch, không dùng chung đáp án với tập huấn luyện."</p></div>
+      <div class="note deep"><h3>Vì sao chia theo đoạn đáp án?</h3><p>Nếu hai câu hỏi khác nhau nhưng cùng một đoạn đáp án
+        mà bị tách ra hai bên, model đã "thấy" đoạn đó lúc học rồi — điểm kiểm tra sẽ đẹp giả tạo. Nhóm chúng lại
+        cùng một phía là cách chặn kiểu rò rỉ này.</p></div>
+    </div>
+  </section>
+
+  <!-- 8 ─────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Thí nghiệm thất bại — và vì sao nó quan trọng</div>
+    <h2>Lần đầu, fine-tune làm model <em>tệ đi</em></h2>
+    <p class="lede">Chúng tôi huấn luyện toàn bộ model trên một bộ dữ liệu pháp lý lớn có sẵn (Zalo).
+      Kết quả trên tập kiểm tra Điện Biên:</p>
+    <div class="grid three">
+      <div class="card"><div class="k">0.83</div><div class="k-label">Model gốc, chưa huấn luyện thêm</div></div>
+      <div class="card"><div class="k bad">0.52</div><div class="k-label">Sau khi fine-tune toàn bộ trên Zalo</div></div>
+      <div class="card"><div class="k good">0.89</div><div class="k-label">Sau khi đổi sang LoRA + dữ liệu đúng domain</div></div>
+    </div>
+    <p style="margin-top:20px"><strong>Chẩn đoán:</strong> dữ liệu Zalo là văn bản luật trung ương, khác hẳn văn phong
+      quyết định hành chính cấp tỉnh. Chỉnh toàn bộ tham số theo nó khiến model <em>quên</em> năng lực tổng quát —
+      hiện tượng catastrophic forgetting. Sửa bằng hai thay đổi: <strong>đổi sang LoRA</strong> và
+      <strong>huấn luyện trên đúng domain đích</strong>.</p>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Tôi muốn kể cả lần thất bại. Lần đầu fine-tune, model
+        <em>tệ đi</em> — từ 0.83 xuống 0.52. Nhờ có quy trình đánh giá nghiêm ngặt nên chúng tôi phát hiện được,
+        chẩn đoán ra là catastrophic forgetting, rồi sửa bằng LoRA và dữ liệu đúng domain. Đó mới là làm kỹ thuật."</p></div>
+      <div class="note deep"><h3>Vì sao nên kể slide này</h3><p>Nó chứng minh ba điều giám khảo tìm: bạn có quy trình
+        đo lường trung thực, bạn hiểu <em>tại sao</em> chứ không chỉ chạy được, và bạn biết cách sửa.
+        Một đội chỉ khoe số đẹp sẽ không có câu chuyện này.</p></div>
+    </div>
+  </section>
+
+  <!-- 9 ─────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Kết quả</div>
+    <h2>Đo trên 18 câu hỏi chưa từng thấy</h2>
+    <div class="tblwrap card" style="padding:6px 10px">
+      <table>
+        <thead><tr><th>Cấu hình</th><th style="text-align:right">Recall@1</th><th style="text-align:right">MRR</th><th style="text-align:right">nDCG@5</th></tr></thead>
+        <tbody>
+          <tr><td>Chỉ tìm kiếm vector (e5)</td><td class="num">0.72</td><td class="num">0.82</td><td class="num">0.86</td></tr>
+          <tr><td>+ reranker gốc (chưa huấn luyện)</td><td class="num">0.83</td><td class="num">0.90</td><td class="num">0.92</td></tr>
+          <tr class="win"><td>+ reranker của chúng tôi (LoRA)</td><td class="num">0.89</td><td class="num">0.94</td><td class="num">0.96</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:18px">Cả ba chỉ số đều tăng, và tăng <strong>so với chính model gốc</strong> —
+      nghĩa là phần huấn luyện của chúng tôi thực sự đóng góp, chứ không phải chỉ nhờ mượn model có sẵn.</p>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Ba dòng: hệ thống ban đầu, thêm model gốc, và thêm model chúng tôi huấn luyện.
+        Recall@1 đi từ <em>0.72 lên 0.83 rồi 0.89</em>. Điều quan trọng là dòng ba cao hơn dòng hai —
+        phần giá trị đó đến từ việc chúng tôi tự huấn luyện."</p></div>
+      <div class="note deep"><h3>Thành thật về giới hạn</h3><p>Tập kiểm tra 18 câu là nhỏ. Nếu bị hỏi, hãy nói thẳng:
+        <em>"Tập test 18 câu nên tôi không tuyên bố con số tuyệt đối; điều tôi tự tin là cả ba chỉ số đều cải thiện
+        đồng thời và tập test được tách sạch."</em> Trả lời thẳng luôn ghi điểm hơn là né.</p></div>
+    </div>
+  </section>
+
+  <!-- 10 ────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Trong sản phẩm thật</div>
+    <h2>Không dừng ở notebook — đã chạy trong API</h2>
+    <div class="grid two">
+      <div class="card"><div class="k good">18/18</div><div class="k-label">câu hỏi có đoạn đúng lọt top-5 sau khi rerank
+        (trước đó: 12/18)</div></div>
+      <div class="card"><strong>Đường đi thật của một câu hỏi</strong>
+        <p style="color:var(--ink-2);margin:.6em 0 0">Model được nạp trong <code>reranking.py</code> của retrieval-api,
+          bật/tắt bằng biến môi trường, và <strong>có đường lui an toàn</strong>: nếu model lỗi, hệ thống tự quay về
+          thứ tự của tầng 1 thay vì hỏng cả tính năng.</p>
+      </div>
+    </div>
+    <p style="margin-top:20px">Kết quả trả về kèm <strong>số trang và số Điều</strong> — đó chính là thứ khiến
+      câu trả lời kiểm chứng được, đúng yêu cầu "grounding" của đề bài.</p>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Model không nằm im trong notebook. Nó chạy trong API thật,
+        bật tắt bằng cấu hình, và <em>có đường lui an toàn</em> — model lỗi thì hệ thống vẫn trả lời được.
+        Đó là khác biệt giữa một thí nghiệm và một sản phẩm."</p></div>
+    </div>
+  </section>
+
+  <!-- 11 ────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Vận hành</div>
+    <h2>Rẻ, tái lập được, và chạy được nội bộ</h2>
+    <div class="grid three">
+      <div class="card"><div class="k">$0</div><div class="k-label">Huấn luyện trên Kaggle GPU miễn phí (P100)</div></div>
+      <div class="card"><div class="k">~20′</div><div class="k-label">Thời gian huấn luyện lại toàn bộ</div></div>
+      <div class="card"><div class="k">CPU</div><div class="k-label">Đủ chạy suy luận khi phục vụ</div></div>
+    </div>
+    <p style="margin-top:20px">Toàn bộ pipeline — thu thập, cắt đoạn, sinh dữ liệu, huấn luyện, đánh giá —
+      đều là script chạy lại được. Và vì model chạy được trên máy nội bộ, phương án
+      <strong>triển khai on-premise</strong> cho dữ liệu pháp lý nhạy cảm là khả thi.</p>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">"Chi phí huấn luyện bằng không, huấn luyện lại mất hai mươi phút,
+        và suy luận chạy được trên CPU. Với dữ liệu pháp lý của tỉnh, <em>chạy nội bộ được</em> là một ưu thế
+        chứ không phải chi tiết phụ."</p></div>
+    </div>
+  </section>
+
+  <!-- 12 ────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Chuẩn bị hỏi đáp</div>
+    <h2>Câu giám khảo dễ hỏi — và cách trả lời</h2>
+    <div class="qa">
+      <details><summary>Sao không dùng thẳng GPT/Claude cho khâu này?</summary>
+        <p>Đây là bài toán xếp hạng 30 đoạn cho mỗi câu hỏi. Cross-encoder chuyên dụng vừa chính xác hơn cho việc này,
+          vừa rẻ hơn nhiều lần, lại chạy được nội bộ — phù hợp dữ liệu pháp lý nhạy cảm. LLM vẫn được dùng, nhưng ở khâu
+          tóm tắt và diễn đạt câu trả lời.</p></details>
+      <details><summary>Tập test 18 câu, có quá nhỏ để kết luận không?</summary>
+        <p>Đúng, nó nhỏ — nên tôi không tuyên bố con số tuyệt đối. Điều tôi tự tin: cả ba chỉ số cùng cải thiện,
+          và tập test được tách theo nhóm đáp án nên không rò rỉ. Bước tiếp theo là mở rộng bộ câu hỏi.</p></details>
+      <details><summary>LoRA khác fine-tune thường ở đâu?</summary>
+        <p>Fine-tune thường chỉnh toàn bộ tham số. LoRA đóng băng model gốc và chỉ huấn luyện vài ma trận nhỏ chèn thêm.
+          Nhờ vậy giữ được kiến thức gốc, ít overfit khi dữ liệu ít, và file kết quả nhẹ hơn nhiều.</p></details>
+      <details><summary>Vì sao huấn luyện trên bộ dữ liệu lớn hơn lại cho kết quả tệ hơn?</summary>
+        <p>Vì lệch domain. Bộ đó là luật trung ương, còn ta phục vụ quyết định hành chính cấp tỉnh — văn phong và
+          cấu trúc khác hẳn. Chỉnh toàn bộ tham số theo domain lệch khiến model quên năng lực tổng quát.
+          Nhiều dữ liệu không bằng đúng dữ liệu.</p></details>
+      <details><summary>Làm sao chắc chắn không bị rò rỉ dữ liệu kiểm tra?</summary>
+        <p>Chúng tôi nhóm câu hỏi theo đoạn đáp án rồi mới chia, nên không đoạn đáp án nào xuất hiện ở cả hai bên.
+          Thực tế lần đo đầu chúng tôi có bị rò rỉ và ra kết quả 1.00 — chính vì thấy nó "đẹp bất thường" nên
+          đã làm lại cho sạch.</p></details>
+      <details><summary>Đưa vào vận hành thật thì độ trễ thế nào?</summary>
+        <p>Reranker chỉ chấm 30 đoạn cho mỗi câu hỏi nên chi phí có giới hạn trên rõ ràng, và chạy được trên CPU.
+          Nếu cần nhanh hơn thì giảm số ứng viên hoặc dùng GPU.</p></details>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Mẹo trả lời</h3><p class="say">Câu nào không chắc, đừng bịa. Công thức an toàn:
+        <em>"Chỗ đó chúng tôi chưa đo, nhưng cách kiểm chứng sẽ là…"</em> — giám khảo đánh giá cao sự trung thực
+        và tư duy kiểm chứng hơn là câu trả lời trơn tru mà rỗng.</p></div>
+    </div>
+  </section>
+
+  <!-- 13 ────────────────────────────────────────────── -->
+  <section class="slide">
+    <div class="eyebrow">Chốt lại</div>
+    <h2>Ba câu để nhớ khi lên sân khấu</h2>
+    <ol class="steps" style="font-size:1.08rem">
+      <li>Chúng tôi <strong>tự huấn luyện một model bằng PyTorch</strong>, đặt đúng vào chỗ quyết định độ tin cậy của câu trả lời.</li>
+      <li>Nó <strong>đo được và thắng thật</strong> trên dữ liệu chưa từng thấy: Recall@1 từ 0.72 lên 0.89.</li>
+      <li>Chúng tôi <strong>kể cả lần thất bại</strong> và cách chẩn đoán — vì đó mới là bằng chứng của năng lực kỹ thuật.</li>
+    </ol>
+    <div class="card" style="margin-top:24px">
+      <strong>Câu kết gợi ý</strong>
+      <p style="margin:.6em 0 0;font-size:1.05rem">"Với cán bộ dự họp, giá trị không nằm ở chỗ hệ thống trả lời trôi chảy,
+        mà ở chỗ họ <em>lật đúng trang, đúng Điều</em> để kiểm chứng. Đó là thứ model PyTorch này bảo vệ."</p>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Nói gì</h3><p class="say">Dừng lại một nhịp trước câu kết. Nói chậm, nhìn giám khảo,
+        rồi mới thả câu cuối. Đừng đọc slide — slide chỉ là chỗ dựa.</p></div>
+    </div>
+  </section>
+
+</main>
+
+<div class="nav">
+  <button class="navbtn" id="prev">← Trước</button>
+  <span class="hint">dùng phím ← →</span>
+  <button class="navbtn" id="next">Tiếp →</button>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  const curEl = document.getElementById("cur");
+  const totEl = document.getElementById("tot");
+  const rail = document.getElementById("rail");
+  const prev = document.getElementById("prev");
+  const next = document.getElementById("next");
+  let i = 0;
+
+  totEl.textContent = slides.length;
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle("on", k === i));
+    curEl.textContent = i + 1;
+    rail.style.width = ((i + 1) / slides.length * 100) + "%";
+    prev.disabled = i === 0;
+    next.disabled = i === slides.length - 1;
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
+  prev.addEventListener("click", () => show(i - 1));
+  next.addEventListener("click", () => show(i + 1));
+
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "SUMMARY") return;
+    if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); show(i + 1); }
+    if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); show(i - 1); }
+  });
+
+  const learn = document.getElementById("m-learn");
+  const present = document.getElementById("m-present");
+  function setMode(m) {
+    document.body.dataset.mode = m;
+    learn.setAttribute("aria-pressed", String(m === "learn"));
+    present.setAttribute("aria-pressed", String(m === "present"));
+  }
+  learn.addEventListener("click", () => setMode("learn"));
+  present.addEventListener("click", () => setMode("present"));
+
+  setMode("learn");
+  show(0);
+</script>
