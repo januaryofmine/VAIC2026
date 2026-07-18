@@ -21,15 +21,19 @@ from storage import BlobStorage, sha256_file
 
 
 def ingest(
-    path: str | Path, conn, embedder: Embedder, storage: BlobStorage | None = None
+    path: str | Path,
+    conn,
+    embedder: Embedder,
+    storage: BlobStorage | None = None,
+    user_id: str | None = None,
 ) -> str:
     p = Path(path)
     doc_type = p.suffix.lower().lstrip(".")
     storage = storage or BlobStorage()
 
-    # Dedup: an identical file already ingested → reuse it (no new row, no re-embed).
+    # Dedup: this owner already ingested an identical file → reuse it (no new row, no re-embed).
     content_hash = sha256_file(p)
-    existing = db.find_document_by_hash(conn, content_hash)
+    existing = db.find_document_by_hash(conn, content_hash, user_id)
     if existing:
         print(f"document_id={existing}", flush=True)
         print("[ingest] reused existing document (dedup)", flush=True)
@@ -47,12 +51,13 @@ def ingest(
             content_hash=content_hash,
             storage_path=storage_path,
             size_bytes=p.stat().st_size,
+            user_id=user_id,
         )
     except psycopg.errors.UniqueViolation:
         # Lost a concurrent double-upload race: another ingest inserted the same
-        # content_hash first (blocked by the partial unique index). Reuse that row.
+        # (owner, content_hash) first (blocked by the partial unique index). Reuse it.
         conn.rollback()
-        doc_id = db.find_document_by_hash(conn, content_hash)
+        doc_id = db.find_document_by_hash(conn, content_hash, user_id)
         print(f"document_id={doc_id}", flush=True)
         print("[ingest] lost dedup race, reused existing (dedup)", flush=True)
         return doc_id
@@ -81,6 +86,7 @@ def main() -> None:
         description="Ingest a PDF/DOCX into Postgres/pgvector"
     )
     parser.add_argument("file", help="Path to a .pdf or .docx file")
+    parser.add_argument("--user-id", default=None, help="Owner user id (from the BFF session)")
     args = parser.parse_args()
 
     if not cfg.database_url:
@@ -89,7 +95,7 @@ def main() -> None:
 
     conn = db.connect(cfg.database_url)
     try:
-        doc_id = ingest(args.file, conn, E5Embedder())
+        doc_id = ingest(args.file, conn, E5Embedder(), user_id=args.user_id)
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT count(*), count(page), count(section) "

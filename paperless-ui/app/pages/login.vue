@@ -1,4 +1,5 @@
 <script setup lang="ts">
+definePageMeta({ layout: false });
 const route = useRoute();
 const { loggedIn, user, clear } = useUserSession();
 const hasError = computed(() => route.query.error === "github_oauth_error");

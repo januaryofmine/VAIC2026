@@ -10,6 +10,7 @@ data/
 .env
 .env.*
 !.env.sample
+deploy/.secrets
 
 # python (rag-pipeline, retrieval-api)
 __pycache__/

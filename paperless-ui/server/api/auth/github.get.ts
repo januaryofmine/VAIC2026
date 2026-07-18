@@ -1,13 +1,21 @@
-// GitHub OAuth callback. nuxt-auth-utils handles the redirect dance; we just map the
-// GitHub profile into our session. Session-only (no users table yet) — see Slice 16.
+// GitHub OAuth callback. nuxt-auth-utils handles the redirect dance; we upsert the
+// GitHub profile into Postgres (via retrieval-api) and store our internal user id in
+// the session — that id is the owner key for documents (Slice 18).
 export default defineOAuthGitHubEventHandler({
   async onSuccess(event, { user }) {
+    const appUser = await upsertUser({
+      github_id: user.id,
+      username: user.login,
+      name: user.name || null,
+      avatar_url: user.avatar_url,
+    });
     await setUserSession(event, {
       user: {
-        githubId: user.id,
-        username: user.login,
-        name: user.name || null,
-        avatarUrl: user.avatar_url,
+        id: appUser.id,
+        githubId: appUser.github_id,
+        username: appUser.username,
+        name: appUser.name,
+        avatarUrl: appUser.avatar_url,
       },
     });
     return sendRedirect(event, "/");
