@@ -29,13 +29,20 @@ app.include_router(ingest_router, prefix="/api")
 app.include_router(users_router, prefix="/api")
 
 
+# Routes that authenticate themselves (so they must be exempt from the api-key gate):
+#  • /api/healthz     — liveness, public
+#  • /api/ingest      — accepts a browser HMAC upload-token OR X-API-Key (see ingest.py),
+#                       so the browser can upload directly without the API_KEY
+_AUTH_EXEMPT = {"/api/healthz", "/api/ingest"}
+
+
 @app.middleware("http")
 async def api_key_guard(request: Request, call_next):
-    """S1: when api_key is set, gate every /api route except the healthcheck.
-    Empty api_key (local dev) leaves everything open."""
+    """S1: when api_key is set, gate every /api route except the self-authenticating
+    ones. Empty api_key (local dev) leaves everything open."""
     key = settings.api_key
     path = request.url.path
-    if key and path.startswith("/api") and path != "/api/healthz":
+    if key and path.startswith("/api") and path not in _AUTH_EXEMPT:
         if request.headers.get("x-api-key") != key:
             return JSONResponse(
                 status_code=401, content={"detail": "invalid or missing API key"}
