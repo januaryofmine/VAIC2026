@@ -15,6 +15,7 @@ export async function getPrepPack(documentId: string): Promise<PrepPackCache> {
   const config = useRuntimeConfig();
   return await $fetch<PrepPackCache>(
     `${config.retrievalApiHost}/api/documents/${documentId}/prep-pack`,
+    { headers: apiKeyHeaders(config.retrievalApiKey) },
   );
 }
 
@@ -28,6 +29,7 @@ export async function savePrepPack(
   await $fetch(`${config.retrievalApiHost}/api/documents/${documentId}/prep-pack`, {
     method: "PUT",
     body: { kind, value },
+    headers: apiKeyHeaders(config.retrievalApiKey),
   });
 }
 
