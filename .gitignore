@@ -38,5 +38,19 @@ docs/Tasks/
 # os
 .DS_Store
 
-# deploy secrets (Supabase pw, tokens, DATABASE_URL cloud) — never commit
-deploy/.secrets
+# finetune: keep scripts / notebooks / processed jsonl; ignore heavy & personal artifacts
+finetune/models/
+finetune/handbook/
+finetune/data/raw/
+finetune/kaggle_staging/
+finetune/kaggle_kernel/
+# kaggle credentials (safety — normally in ~/.kaggle)
+kaggle.json
+
+# generated deploy staging + local vercel/hf state
+deploy/.vercel-api-build/
+.vercel/
+
+# AI monitoring: trace sink cục bộ (LLM_TRACE_FILE) — dữ liệu chạy, không commit
+.llm-trace*.jsonl
+.gstack/

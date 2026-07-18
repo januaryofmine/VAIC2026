@@ -112,3 +112,7 @@ class RetrieveChunk(BaseModel):
 class RetrieveResponse(BaseModel):
     chunks: list[RetrieveChunk]
     reformulated_query: str
+    # Whether stage-2 cross-encoder reranking ran. Exposed so a deployed host can be
+    # checked from outside (the fine-tuned reranker is easy to mis-deploy silently:
+    # a bad model path falls back to retrieval order and still returns 200).
+    reranked: bool = False

@@ -82,16 +82,34 @@ def _blocks_from_pages(pages: list[str]) -> list[Block]:
     return blocks
 
 
+def _pages_from_pdfplumber(path: Path) -> list[str]:
+    """Pure-Python PDF text per page (no poppler) — used where pdftotext is absent
+    (e.g. serverless cloud hosts). Layout is less precise than `pdftotext -layout`
+    but section/page detection still works on the extracted text."""
+    import pdfplumber
+
+    pages: list[str] = []
+    with pdfplumber.open(str(path)) as pdf:
+        for pg in pdf.pages:
+            pages.append(pg.extract_text() or "")
+    return pages
+
+
 def parse_pdf(path: Path) -> ParsedDoc:
-    result = subprocess.run(
-        ["pdftotext", "-layout", str(path), "-"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    pages = pages_from_pdftotext(result.stdout)
-    if pages and not pages[-1].strip():  # pdftotext often leaves a trailing empty page
-        pages = pages[:-1]
+    import shutil
+
+    if shutil.which("pdftotext"):
+        result = subprocess.run(
+            ["pdftotext", "-layout", str(path), "-"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        pages = pages_from_pdftotext(result.stdout)
+        if pages and not pages[-1].strip():  # pdftotext leaves a trailing empty page
+            pages = pages[:-1]
+    else:
+        pages = _pages_from_pdfplumber(path)  # fallback: no poppler on this host
     blocks = _blocks_from_pages(pages)
     return ParsedDoc(blocks=tuple(blocks), page_count=len(pages))
 

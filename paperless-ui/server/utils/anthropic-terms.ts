@@ -16,11 +16,18 @@ const termsSchema = z.object({
   terms: z
     .array(
       z.object({
-        term: z.string(),
-        explanation: z.string().describe("Giải thích ngắn gọn, dễ hiểu bằng tiếng Việt"),
+        term: z.string().min(1),
+        explanation: z
+          .string()
+          .min(10)
+          .describe("Giải thích ngắn gọn, dễ hiểu bằng tiếng Việt"),
       }),
     )
-    .describe("Ít nhất 10 thuật ngữ chuyên ngành/pháp lý quan trọng"),
+    // .min(10) ENFORCES deliverable #2 (≥10 terms): the AI SDK re-asks the model
+    // when validation fails, so a short list can't silently ship. A 40-60pp legal
+    // document always yields ≥10 specialized terms, so this never spuriously fails.
+    .min(10, "Cần ít nhất 10 thuật ngữ chuyên ngành")
+    .describe("Ít nhất 10 thuật ngữ chuyên ngành/pháp lý quan trọng, không trùng lặp"),
 });
 
 const MAP_MAX_TOKENS = 500;

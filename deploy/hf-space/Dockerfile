@@ -45,6 +45,17 @@ ENV RAG_PIPELINE_DIR=/home/user/app/rag-pipeline
 # Pre-download the embedding model so the first request isn't a ~2GB cold start.
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('intfloat/multilingual-e5-large')"
 
+# Stage-2 reranker (the fine-tuned cross-encoder). Baked into the image cache, not
+# the image layers as files: we pull it from the Hub at build time so the ~2.3GB
+# checkpoint never has to be committed to git or uploaded with the Space source.
+# Empty ARG (the default) skips this entirely → image builds fine without a reranker.
+ARG RERANKER_MODEL=""
+RUN if [ -n "$RERANKER_MODEL" ]; then \
+      python -c "from sentence_transformers import CrossEncoder; CrossEncoder('$RERANKER_MODEL')" ; \
+    else \
+      echo "no RERANKER_MODEL build-arg → skipping reranker preload" ; \
+    fi
+
 WORKDIR /home/user/app/retrieval-api
 EXPOSE 7860
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]

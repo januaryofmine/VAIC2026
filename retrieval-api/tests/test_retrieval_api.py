@@ -57,6 +57,58 @@ def test_retrieve_uses_reformulated_query(monkeypatch):
     assert captured["q"] == "TRUY VẤN VIẾT LẠI"  # retrieval uses the reformulated query
 
 
+def _stub_stage1(monkeypatch, captured):
+    """Stub reformulation + stage-1 retrieval, recording the top_k it was asked for."""
+    monkeypatch.setattr(retrieve_router, "reformulate_query", lambda q, **kw: q)
+
+    def _fake_retrieve(conn, q, doc, top_k, **kw):
+        captured["fetch_k"] = top_k
+        return [
+            {"id": str(i), "position": i, "page": 1, "section": None, "text": f"t{i}",
+             "score": 0.5}
+            for i in range(top_k)
+        ]
+
+    monkeypatch.setattr(retrieve_router, "retrieve", _fake_retrieve)
+
+
+def test_stage1_fetches_only_top_k_when_reranker_off(monkeypatch):
+    captured = {}
+    _stub_stage1(monkeypatch, captured)
+    r = TestClient(app).post(
+        "/api/retrieve", json={"question": "q", "document_id": _DOC_ID, "top_k": 5}
+    )
+    assert r.status_code == 200
+    assert captured["fetch_k"] == 5  # no second stage → no reason to over-fetch
+    assert r.json()["reranked"] is False
+
+
+def test_stage1_fetches_wide_candidate_pool_when_reranker_on(monkeypatch):
+    """The reranker can only promote a chunk stage 1 returned, so with rerank on,
+    stage 1 must fetch retrieval_candidates (not top_k)."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "reranker_enabled", True)
+    monkeypatch.setattr(settings, "retrieval_candidates", 30)
+
+    captured = {}
+    _stub_stage1(monkeypatch, captured)
+    # Keep the cross-encoder out of it: assert the plumbing, not the model.
+    monkeypatch.setattr(
+        retrieve_router, "rerank", lambda q, rows, top_k, model: rows[:top_k]
+    )
+
+    r = TestClient(app).post(
+        "/api/retrieve", json={"question": "q", "document_id": _DOC_ID, "top_k": 5}
+    )
+    assert r.status_code == 200
+    assert captured["fetch_k"] == 30  # wide pool handed to stage 2
+    body = r.json()
+    assert len(body["chunks"]) == 5  # narrowed back down for the caller
+    assert body["reranked"] is True
+
+
 def test_retrieve_bad_uuid_422():
     r = TestClient(app).post("/api/retrieve", json={"question": "x", "document_id": "nope"})
     assert r.status_code == 422

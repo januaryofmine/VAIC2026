@@ -11,7 +11,7 @@ import re
 import psycopg
 from psycopg.rows import dict_row
 
-from app.services.embedding import embed_query
+from app.services.embed_provider import embed_query
 
 # Common Vietnamese function words — drop from the lexical query so it keys on content.
 _STOPWORDS = {

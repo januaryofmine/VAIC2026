@@ -24,6 +24,14 @@ export default defineNuxtConfig({
     retrievalApiKey: "",
     ai: {
       // Anthropic key is read from ANTHROPIC_API_KEY by the AI SDK directly.
+      // provider: "anthropic" (default) | "openai-compatible" (e.g. 9router gateway).
+      // Override with NUXT_AI_PROVIDER / NUXT_AI_BASE_URL / NUXT_AI_API_KEY, and set the
+      // model names below to whatever the gateway exposes (e.g. oc/deepseek-v4-flash-free).
+      provider: "anthropic",
+      baseUrl: "http://localhost:20128/v1",
+      apiKey: "",
+      // Reasoning models return EMPTY content unless thinking is disabled — see provider.ts.
+      disableReasoning: true,
       summarizeMapModel: "claude-haiku-4-5-20251001", // cheap/fast for the map step
       summarizeReduceModel: "claude-sonnet-4-6", // quality for structured reduce
       chatModel: "claude-sonnet-4-6",

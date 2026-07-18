@@ -10,7 +10,10 @@ export interface QuestionsResult {
 
 const questionsSchema = z.object({
   questions: z
-    .array(z.string())
+    .array(z.string().min(10))
+    // .min(5) ENFORCES deliverable #3 (≥5 critical questions): the AI SDK re-asks
+    // the model on a short list, so it can't silently ship fewer than 5.
+    .min(5, "Cần ít nhất 5 câu hỏi phản biện")
     .describe("Ít nhất 5 câu hỏi phản biện, chất lượng, cán bộ nên chuẩn bị"),
 });
 

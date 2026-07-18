@@ -58,6 +58,19 @@ def main() -> int:
         "The UI proxy calls server-to-server so this is defense-in-depth; the real "
         "gate is API_KEY.",
     )
+    ap.add_argument(
+        "--reranker-model",
+        default="",
+        help="Hub repo id of the fine-tuned reranker (run push_model_hf.py first), "
+        "e.g. myuser/bge-reranker-dienbien. Empty = stage-2 rerank stays off.",
+    )
+    ap.add_argument(
+        "--reranker-candidates",
+        type=int,
+        default=20,
+        help="candidates the cross-encoder re-scores per query. Lower = faster on "
+        "the Space's 2 vCPU (each pair is a full transformer pass).",
+    )
     args = ap.parse_args()
 
     sec = read_secrets(Path(args.secrets))
@@ -96,6 +109,24 @@ def main() -> int:
     cors_json = "[" + ",".join(f'"{o.strip()}"' for o in origins.split(",")) + "]"
     api.add_space_variable(repo_id=repo_id, key="CORS_ORIGINS", value=cors_json)
     print(f"set variable CORS_ORIGINS={cors_json}")
+
+    # Stage-2 reranker. Set as *variables* (not secrets) on purpose: HF passes Space
+    # variables to the Docker build as build args, which is what lets the Dockerfile's
+    # `ARG RERANKER_MODEL` preload the checkpoint instead of paying a ~2.3GB download
+    # on the first question.
+    if args.reranker_model:
+        api.add_space_variable(repo_id=repo_id, key="RERANKER_ENABLED", value="true")
+        api.add_space_variable(repo_id=repo_id, key="RERANKER_MODEL", value=args.reranker_model)
+        api.add_space_variable(
+            repo_id=repo_id,
+            key="RETRIEVAL_CANDIDATES",
+            value=str(args.reranker_candidates),
+        )
+        print(f"set variables RERANKER_ENABLED=true RERANKER_MODEL={args.reranker_model} "
+              f"RETRIEVAL_CANDIDATES={args.reranker_candidates}")
+    else:
+        print("WARN: no --reranker-model → stage-2 rerank OFF (retrieval falls back to "
+              "embedding order; citation accuracy drops)")
 
     staging = Path(tempfile.mkdtemp()) / "space"
     try:

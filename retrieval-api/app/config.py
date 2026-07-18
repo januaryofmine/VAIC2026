@@ -11,9 +11,12 @@ class Settings(BaseSettings):
     api_key: str = ""
     max_upload_mb: int = 25  # reject oversized ingest uploads (DoS guard)
 
-    # embedding (query side) — must match the ingestion model (multilingual-e5-large)
+    # embedding (query side) — must match the ingestion model / dim.
+    # provider: "e5" (self-hosted sentence-transformers) | "gemini" (API, no torch).
+    embedding_provider: str = "e5"
     embedding_model: str = "intfloat/multilingual-e5-large"
     embedding_prefix_query: str = "query: "
+    gemini_api_key: str = ""
 
     # hybrid retrieval (dense vector + Postgres full-text, fused with RRF)
     retrieval_top_k: int = 10
@@ -25,7 +28,8 @@ class Settings(BaseSettings):
     # old behavior. When enabled: retrieve `retrieval_candidates` (wide over-fetch),
     # then the cross-encoder re-ranks down to retrieval_top_k. Needs torch → HF Space
     # only (never enable on the torch-free Vercel host). Point reranker_model at a
-    # fine-tuned dir (Slice 21) for Vietnamese-legal quality.
+    # fine-tuned dir (Slice 21) or a Hub repo for Vietnamese-legal quality, e.g.
+    # RERANKER_MODEL=jakethepinkpanther/bge-reranker-dienbien
     reranker_enabled: bool = False
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
     retrieval_candidates: int = 30  # candidate pool fed to the reranker (H1 over-fetch)
