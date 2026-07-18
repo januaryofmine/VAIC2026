@@ -1,0 +1,11 @@
+# Văn bản pháp quy công khai — tỉnh Điện Biên (Công báo / QPPL)
+# Mỗi dòng 1 URL. .pdf/.doc tải trực tiếp; URL khác -> extract text HTML.
+# Crawler (crawl_congbao.py) sẽ append thêm vào cuối file này.
+https://congbao.dienbien.gov.vn/congbao/congbao.nsf/E3DF67156F9A7BA447258710002A744E/$file/08-NQ-H%C4%90ND.pdf
+https://congbao.dienbien.gov.vn/congbao/congbao.nsf/437DBDF13A9B281C47258A01003543B1/$file/141_NQ-H%C4%90ND-2023.PDF
+https://congbao.dienbien.gov.vn/congbao/congbao.nsf/BCC7C13863B446CE47258D80000837B3/$file/56(10.01.2026_16h35p25)_signed.pdf
+https://congbao.dienbien.gov.vn/congbao/congbao.nsf/C142DDD60093C7CB4725881A0028F254/$file/534-Q%C4%90-UBND-Signed.pdf
+https://congbao.dienbien.gov.vn/congbao/congbao.nsf/692C8FF8D6914424472585EC00057E58/$file/951_signed_signed_signed.PDF
+https://congbao.dienbien.gov.vn/congbao/congbao.nsf/228A43AB299B32AD4725885400142868/$file/970-Q%C4%90-UBND-Signed.pdf
+https://congbao.dienbien.gov.vn/congbao/congbao.nsf/15FAA900CFD57F9C47258AA90008F83B/$file/01-Q%C4%90-UBND.docx
+https://qppl.dienbien.gov.vn/qlvb/vbpq.nsf/str/C02C7C909D67950247258D0D000662CA/$file/66.3_2025_NQ-CP_15092025_1-signed.pdf

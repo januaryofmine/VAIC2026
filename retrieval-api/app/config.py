@@ -10,6 +10,13 @@ class Settings(BaseSettings):
     embedding_prefix_query: str = "query: "
     retrieval_top_k: int = 5
 
+    # reranking (optional 2nd stage). Disabled by default → identical old behavior.
+    # When enabled: retrieve `retrieval_candidates` by cosine, then cross-encoder
+    # re-ranks down to retrieval_top_k. Point reranker_model at the fine-tuned dir.
+    reranker_enabled: bool = False
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
+    retrieval_candidates: int = 30
+
     # reformulation (optional LLM query rewrite). "none" = passthrough (no LLM call).
     reformulation_provider: str = "none"  # "none" | "anthropic"
     reformulation_model: str = "claude-haiku-4-5-20251001"

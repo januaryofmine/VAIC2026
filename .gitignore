@@ -32,3 +32,12 @@ uploads/
 
 # os
 .DS_Store
+
+# finetune: keep scripts / notebooks / processed jsonl; ignore heavy & personal artifacts
+finetune/models/
+finetune/handbook/
+finetune/data/raw/
+finetune/kaggle_staging/
+finetune/kaggle_kernel/
+# kaggle credentials (safety — normally in ~/.kaggle)
+kaggle.json

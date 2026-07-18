@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.routers.documents import router as documents_router
+from app.routers.ingest import router as ingest_router
 from app.routers.retrieve import router as retrieve_router
 
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +24,7 @@ app.add_middleware(
 
 app.include_router(documents_router, prefix="/api")
 app.include_router(retrieve_router, prefix="/api")
+app.include_router(ingest_router, prefix="/api")
 
 
 @app.exception_handler(Exception)
