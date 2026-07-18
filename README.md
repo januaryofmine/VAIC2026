@@ -17,7 +17,7 @@ This AI application lets an official **upload a document and, in under a minute,
 
 Single monorepo. 
 
-![Architecture](./docs/paperless.drawio.png)
+![Architecture](./docs/paperless.png)
 
 #### Updates
 
