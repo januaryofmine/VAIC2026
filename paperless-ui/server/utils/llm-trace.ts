@@ -16,7 +16,34 @@
  * trong .env. Self-host on-prem chỉ cần đổi LANGFUSE_BASE_URL.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
+
 type Usage = { input?: number; output?: number; total?: number };
+
+/**
+ * Ngữ cảnh trace theo REQUEST.
+ *
+ * Một câu hỏi thực tế gồm nhiều lời gọi: lập kế hoạch (planStrategy) → N lần
+ * truy xuất → sinh câu trả lời. Nếu mỗi lời gọi tự sinh id riêng thì trong
+ * Langfuse chúng thành các mảnh rời, không truy nguyên được "vì sao câu trả lời
+ * này sai". AsyncLocalStorage cho phép route handler đặt id MỘT LẦN rồi mọi lời
+ * gọi bên trong tự nhặt lấy — không phải sửa chữ ký của getModel / từng utils.
+ */
+const traceContext = new AsyncLocalStorage<{ traceId: string }>();
+
+export function newTraceId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** Chạy `fn` với traceId gắn vào ngữ cảnh — mọi lời gọi LLM bên trong dùng chung id. */
+export function runWithTrace<T>(traceId: string, fn: () => T): T {
+  return traceContext.run({ traceId }, fn);
+}
+
+/** traceId của request hiện tại (nếu handler đã bọc bằng runWithTrace). */
+export function currentTraceId(): string | undefined {
+  return traceContext.getStore()?.traceId;
+}
 
 function config() {
   const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
@@ -112,7 +139,9 @@ export type TraceLLMInput = {
 /** Ghi 1 lần gọi LLM (kèm trace bao ngoài) — fire-and-forget. */
 export function traceLLM(e: TraceLLMInput): void {
   if (!isTracingEnabled()) return;
-  const traceId = e.traceId ?? uuid();
+  // Ưu tiên id do handler đặt (runWithTrace) → mọi lời gọi của cùng một câu hỏi
+  // gom về MỘT trace. Không có thì mới sinh id rời.
+  const traceId = e.traceId ?? currentTraceId() ?? uuid();
   const now = new Date().toISOString();
   const latencyMs = e.endTime.getTime() - e.startTime.getTime();
 
