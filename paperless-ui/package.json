@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.63",
+    "@ai-sdk/openai-compatible": "^2.0.62",
     "@ai-sdk/vue": "^3.0.116",
     "@nuxt/ui": "^4.6.0",
     "ai": "^6.0.116",

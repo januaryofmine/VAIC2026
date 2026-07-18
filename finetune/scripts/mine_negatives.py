@@ -43,6 +43,7 @@ def tok(s: str) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--neg", type=int, default=6, help="hard negatives per query")
+    ap.add_argument("--test-frac", type=float, default=0.35, help="held-out fraction for eval")
     args = ap.parse_args()
 
     chunks = [json.loads(l) for l in CHUNKS.read_text(encoding="utf-8").splitlines()]
@@ -60,23 +61,42 @@ def main() -> int:
         return 1
 
     all_ids = list(by_id.keys())
+
+    # Clean train/test split: group queries by positive chunk so no positive chunk
+    # appears in BOTH splits (prevents memorization leakage). Shuffle groups by seed.
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for q in qa:
+        groups[q["positive_chunk_id"]].append(q)
+    group_keys = sorted(groups.keys())
+    RNG.shuffle(group_keys)
+    n_test_q = int(len(qa) * args.test_frac)
+    test_qs, train_qs, taken = [], [], 0
+    for gk in group_keys:
+        if taken < n_test_q:
+            test_qs.extend(groups[gk])
+            taken += len(groups[gk])
+        else:
+            train_qs.extend(groups[gk])
+    print(f"split: {len(train_qs)} train / {len(test_qs)} test queries "
+          f"(grouped by positive chunk, no leakage)")
+
     train_rows, eval_rows = [], []
 
-    for q in qa:
+    # eval set = held-out test queries only
+    for q in test_qs:
+        doc_chunks = by_doc[q["doc_id"]]
+        cand_ids = [f'{c["doc_id"]}::{c["position"]}' for c in doc_chunks]
+        eval_rows.append({
+            "query": q["query"], "doc_id": q["doc_id"],
+            "positive_id": q["positive_chunk_id"], "candidate_ids": cand_ids,
+        })
+
+    # train triples = train queries with BM25 hard negatives
+    for q in train_qs:
         pos_id = q["positive_chunk_id"]
         doc_id = q["doc_id"]
         doc_chunks = by_doc[doc_id]
         cand_ids = [f'{c["doc_id"]}::{c["position"]}' for c in doc_chunks]
-
-        # eval: full same-doc candidate pool
-        eval_rows.append(
-            {
-                "query": q["query"],
-                "doc_id": doc_id,
-                "positive_id": pos_id,
-                "candidate_ids": cand_ids,
-            }
-        )
 
         # hard negatives via BM25 over same-doc chunks (excluding positive)
         neg_pool = [cid for cid in cand_ids if cid != pos_id]

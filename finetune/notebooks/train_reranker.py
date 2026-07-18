@@ -191,6 +191,19 @@ def train(args) -> None:
     model.config.use_cache = False
     model.gradient_checkpointing_enable()
 
+    # LoRA: freeze the strong base and learn small adapters. On a tiny in-domain set
+    # this avoids the catastrophic forgetting that full fine-tuning on Zalo caused.
+    if args.use_lora:
+        from peft import LoraConfig, TaskType, get_peft_model
+
+        lconf = LoraConfig(
+            task_type=TaskType.SEQ_CLS, r=args.lora_r, lora_alpha=args.lora_alpha,
+            lora_dropout=0.05, target_modules=["query", "key", "value"],
+        )
+        model = get_peft_model(model, lconf)
+        model.enable_input_require_grads()  # needed with gradient checkpointing + LoRA
+        model.print_trainable_parameters()
+
     ds = PairDataset(triples)
     loader = DataLoader(
         ds, batch_size=args.batch_size, shuffle=True,
@@ -239,6 +252,8 @@ def train(args) -> None:
                     log(f"epoch {epoch} step {step}/{total_steps} loss {running/(args.log_every*accum):.4f} lr {sched.get_last_lr()[0]:.2e}")
                     running = 0.0
 
+    if args.use_lora:  # merge adapters into the base so serving loads a plain model
+        model = model.merge_and_unload()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(out)
@@ -259,6 +274,9 @@ def main() -> None:
     ap.add_argument("--neg-per-pos", type=int, default=7)
     ap.add_argument("--max-queries", type=int, default=None, help="cap Zalo queries (debug)")
     ap.add_argument("--skip-zalo", action="store_true", help="in-domain only")
+    ap.add_argument("--use-lora", action="store_true", help="parameter-efficient LoRA fine-tune")
+    ap.add_argument("--lora-r", type=int, default=16)
+    ap.add_argument("--lora-alpha", type=int, default=32)
     ap.add_argument("--num-workers", type=int, default=2, help="DataLoader workers (0 on Windows)")
     ap.add_argument("--log-every", type=int, default=20)
     train(ap.parse_args())
