@@ -50,4 +50,7 @@ kaggle.json
 # generated deploy staging + local vercel/hf state
 deploy/.vercel-api-build/
 .vercel/
+
+# AI monitoring: trace sink cục bộ (LLM_TRACE_FILE) — dữ liệu chạy, không commit
+.llm-trace*.jsonl
 .gstack/
