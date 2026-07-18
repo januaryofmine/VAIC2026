@@ -1,10 +1,12 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
+from app.deps import close_pool, init_pool
 from app.routers.documents import router as documents_router
 from app.routers.ingest import router as ingest_router
 from app.routers.retrieve import router as retrieve_router
@@ -14,7 +16,21 @@ logging.basicConfig(level=logging.INFO)
 
 settings = get_settings()
 
-app = FastAPI(title="Paperless Meetings — Retrieval API", docs_url=None, redoc_url=None)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Open the shared DB pool once (warm connection ready) before serving; close on shutdown.
+    init_pool()
+    yield
+    close_pool()
+
+
+app = FastAPI(
+    title="Paperless Meetings — Retrieval API",
+    docs_url=None,
+    redoc_url=None,
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,

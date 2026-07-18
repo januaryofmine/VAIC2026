@@ -31,6 +31,7 @@ RUN pip install --no-cache-dir --user \
         "fastapi>=0.115.0" \
         "uvicorn[standard]>=0.34.0" \
         "psycopg[binary]>=3.2.0" \
+        "psycopg-pool>=3.2.0" \
         "pgvector>=0.4.2" \
         "pydantic-settings>=2.7.0" \
         "sentence-transformers>=3.0.0" \
