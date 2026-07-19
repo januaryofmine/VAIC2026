@@ -49,6 +49,16 @@ Ba điều rút ra:
 
 Chi tiết: [finetune/EXPERIMENT_MULTIPROVINCE.md](finetune/EXPERIMENT_MULTIPROVINCE.md).
 
+**Vòng 3 — thử fine-tune chính tầng truy xuất e5 (19/07): KHÔNG DÙNG.** Vì trần đã dịch sang
+e5, nhóm viết `train_retriever.py` (contrastive InfoNCE + hard negative BM25, LoRA trên
+bi-encoder) và chạy 2 cấu hình. Cả hai đều thất bại theo hai kiểu đối nhau: lr 1e-4 học đủ
+mạnh thì **làm hỏng** (Recall@5 mất 1 câu, MRR đứng yên ⇒ chỉ xáo chỗ); lr 2e-5 đủ nhẹ để an
+toàn thì **không học gì** (recall trùng khít bản gốc). Với 46 ví dụ, **không có điểm cân bằng
+có ích** — đây là giới hạn dữ liệu, không phải siêu tham số.
+→ Tầng truy xuất **giữ nguyên `multilingual-e5-large` bản gốc**. Quy luật rút ra:
+*fine-tune chỗ ảnh hưởng cục bộ (cross-encoder), giữ nguyên chỗ ảnh hưởng toàn cục (bi-encoder).*
+Chi tiết: [finetune/EXPERIMENT_RETRIEVER.md](finetune/EXPERIMENT_RETRIEVER.md).
+
 **Câu chuyện kỹ thuật (tư duy khoa học, không chỉ code):**
 - Full fine-tune trên dataset ngoài domain (Zalo legal) → **overfit / catastrophic forgetting**,
   tệ hơn cả model gốc (R@1 rớt còn 0.52 trên held-out).

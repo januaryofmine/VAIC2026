@@ -75,9 +75,44 @@ thì hạ cường độ học phải cho kết quả khá hơn.
 > Ghi rõ để minh bạch: đây là **cấu hình thứ hai và là cấu hình cuối** được thử ở nhánh này.
 > Cả hai kết quả đều được báo cáo. Không chạy tiếp rồi chỉ chọn lần đẹp nhất.
 
-**Nếu lần 2 vẫn không thắng e5 gốc ở `Recall@5`**, kết luận sẽ là: ở quy mô dữ liệu hiện tại
-(46 ví dụ huấn luyện), **không nên fine-tune tầng truy xuất**. Đường đi đúng khi đó là sửa
-**dữ liệu và cách cắt đoạn**, không phải sửa trọng số mô hình.
+### Kết quả lần 2
+
+| Chỉ số (33 câu) | e5 gốc | e5 fine-tune lần 2 | Chênh lệch |
+|---|---|---|---|
+| Recall@1 | 0.6970 | 0.6970 | **0** |
+| Recall@3 | 0.9394 | 0.9394 | **0** |
+| Recall@5 | 0.9697 | 0.9697 | **0** |
+| MRR | 0.8210 | 0.8159 | −0.0051 |
+| nDCG@5 | 0.8577 | 0.8537 | −0.0040 |
+
+**Không hỏng nữa — nhưng cũng không học được gì.** Loss gần như không giảm:
+`2,5537 → 2,4723` sau 4 epoch, tổng cộng chỉ **20 bước tối ưu**. Cả ba chỉ số recall
+trùng khít mô hình gốc; phần chênh lệch còn lại ở MRR/nDCG là một nhiễu nhỏ theo chiều xấu.
+
+Nói đúng bản chất: cấu hình thận trọng "sửa" được thiệt hại của lần 1 bằng cách **gần như
+không huấn luyện gì cả**.
+
+*(Lưu ý khi đọc: giá trị loss của hai lần không so trực tiếp được — lần 2 dùng 8 hard negative
+nên bài toán phân loại rộng hơn, mức loss nền vốn cao hơn.)*
+
+---
+
+## Kết luận cuối: KHÔNG fine-tune tầng truy xuất ở quy mô dữ liệu này
+
+Hai lần chạy **kẹp trọn hai đầu** của khoảng tham số, và không có khoảng giữa nào dùng được:
+
+| | Cường độ học | Kết quả |
+|---|---|---|
+| Lần 1 | đủ mạnh để học (loss 2,13 → 1,04) | **làm hỏng** — Recall@5 mất 1 câu |
+| Lần 2 | đủ nhẹ để an toàn (loss 2,55 → 2,47) | **không học gì** — recall y hệt gốc |
+
+Học đủ để thay đổi thì làm méo không gian vector; học nhẹ để khỏi méo thì thành phép rỗng.
+Với 46 ví dụ, **không tồn tại điểm cân bằng có ích**. Đây là giới hạn của lượng dữ liệu, không
+phải của siêu tham số — nên dò thêm siêu tham số là vô nghĩa và nhánh này **dừng tại đây**.
+
+**Tầng truy xuất giữ nguyên `intfloat/multilingual-e5-large` bản gốc.** Câu hỏi bị lọt khỏi
+top-5 vẫn còn đó, và cách sửa đúng nằm ở **dữ liệu / cách cắt đoạn**, không phải ở trọng số:
+cụ thể là soi lại xem đoạn chứa đáp án của câu đó có bị cắt vỡ ngữ cảnh hay không.
 
 ## Giá trị của nhánh này dù kết quả âm
 
@@ -87,7 +122,11 @@ Ba lần fine-tune trên cùng một tập test cho một quy luật nhất quá
 |---|---|---|
 | Cross-encoder (reranker) | Zalo — lệch domain | **0.52** ↓↓ hỏng nặng |
 | Cross-encoder (reranker) | Điện Biên — đúng domain | **0.8485** ↑ thắng rõ |
-| Bi-encoder (e5) | Điện Biên — đúng domain | **xấu đi ở R@5** |
+| Bi-encoder (e5) | Điện Biên — đúng domain | **hỏng hoặc vô hiệu** |
 
 → Đúng domain là **điều kiện cần, không phải điều kiện đủ**. Còn phải chọn đúng **thành phần**
 để huấn luyện: ở quy mô dữ liệu nhỏ, cross-encoder là chỗ đáng train, bi-encoder thì không.
+
+Đây cũng là lý do kiến trúc hai tầng được giữ nguyên: **fine-tune chỗ rẻ và an toàn
+(cross-encoder, ảnh hưởng cục bộ), giữ nguyên chỗ đắt và dễ vỡ (bi-encoder, ảnh hưởng toàn cục).**
+Kết luận này rút ra từ đo đạc, không phải từ giả định ban đầu.
