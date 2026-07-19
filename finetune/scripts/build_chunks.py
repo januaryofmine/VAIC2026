@@ -21,8 +21,8 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW = ROOT / "data" / "raw"
-OUT = ROOT / "data" / "chunks.jsonl"
+DEFAULT_RAW = ROOT / "data" / "raw"
+DEFAULT_OUT = ROOT / "data" / "chunks.jsonl"
 
 MAX_CHARS = 1500
 MIN_CHARS = 200
@@ -159,8 +159,17 @@ def slug(name: str) -> str:
 
 
 def main() -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--raw", default=str(DEFAULT_RAW), help="dir of downloaded documents")
+    ap.add_argument("--out", default=str(DEFAULT_OUT), help="chunks.jsonl to write")
+    ap.add_argument("--province", default="", help="tag written onto every chunk")
+    args = ap.parse_args()
+    RAW, OUT = Path(args.raw), Path(args.out)
+
     if not RAW.exists():
-        print("no data/raw", file=sys.stderr)
+        print(f"no {RAW}", file=sys.stderr)
         return 1
     # Dedupe case-insensitively (Windows: *.pdf and *.PDF match the same file).
     seen_paths: dict[str, Path] = {}
@@ -193,16 +202,17 @@ def main() -> int:
         n_dieu = len({c.section for c in chunks if c.section})
         print(f"  {f.name}: pages={n_pages} chars={total_chars} chunks={len(chunks)} articles={n_dieu}")
         for i, c in enumerate(chunks):
-            rows.append(
-                {
-                    "doc_id": doc_id,
-                    "filename": f.name,
-                    "position": i,
-                    "page": c.page,
-                    "section": c.section,
-                    "text": c.text,
-                }
-            )
+            row = {
+                "doc_id": doc_id,
+                "filename": f.name,
+                "position": i,
+                "page": c.page,
+                "section": c.section,
+                "text": c.text,
+            }
+            if args.province:  # tag the source so train/test can be split by province
+                row["province"] = args.province
+            rows.append(row)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with OUT.open("w", encoding="utf-8") as fh:

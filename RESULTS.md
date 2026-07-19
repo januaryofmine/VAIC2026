@@ -17,6 +17,25 @@ positive chunk nên **không rò rỉ** (train và test không dùng chung đáp
 | + bge-reranker-v2-m3 gốc | 0.83 | 1.00 | 1.00 | 0.90 | 0.92 |
 | **+ reranker fine-tune (LoRA in-domain)** | **0.89** | 1.00 | 1.00 | **0.94** | **0.96** |
 
+**Thí nghiệm bổ sung — thêm dữ liệu tỉnh khác vào train (19/07):**
+
+Thu thập 43 văn bản Sơn La/Đắk Lắk (1.101 chunks), soạn 53 câu hỏi, train lại với 67 câu
+(35 Điện Biên + 32 tỉnh khác) — **giữ nguyên tập test 18 câu**. Kết quả: **0.8889 / 0.9444 /
+0.9590 — trùng khít baseline, dịch chuyển đúng 0,0000.**
+
+Ý nghĩa: dữ liệu **cùng domain** (tỉnh khác nhưng cùng thể loại văn bản) **không gây hại** —
+khác hẳn Zalo (lệch domain) làm R@1 rớt còn 0.52. Nhưng cũng không cải thiện, vì tập test
+**đã chạm trần**: Recall@3 và @5 đều = 1.000, chỉ còn 2/18 câu chưa đạt hạng 1.
+→ Nút thắt là **độ phân giải của tập test**, không phải lượng dữ liệu train.
+
+**Vòng 2 — đã xử lý đúng nút thắt đó (19/07):** soạn thêm 26 câu hỏi Điện Biên từ các chunk
+**chưa từng dùng làm đáp án** (`scripts/dump_unused.py` cho thấy 198 chunks nhưng mới dùng 41)
+→ **79 QA**, chia lại grouped **46 train / 33 test**. Mỗi câu test giờ đáng **3,0** điểm phần
+trăm thay vì 5,6. Đang chạy lại **cả hai cấu hình** (46 ĐB vs 78 đa tỉnh) trên tập test mới —
+vì tập test đổi nên số cũ không so trực tiếp được, phải đo lại cả hai để giữ tính kiểm soát.
+
+Chi tiết: [finetune/EXPERIMENT_MULTIPROVINCE.md](finetune/EXPERIMENT_MULTIPROVINCE.md).
+
 **Câu chuyện kỹ thuật (tư duy khoa học, không chỉ code):**
 - Full fine-tune trên dataset ngoài domain (Zalo legal) → **overfit / catastrophic forgetting**,
   tệ hơn cả model gốc (R@1 rớt còn 0.52 trên held-out).

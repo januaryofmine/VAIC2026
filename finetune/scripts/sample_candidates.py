@@ -18,15 +18,19 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[1]
-CHUNKS = ROOT / "data" / "chunks.jsonl"
-OUT = ROOT / "data" / "qa_candidates.txt"
+DEFAULT_CHUNKS = ROOT / "data" / "chunks.jsonl"
+DEFAULT_OUT = ROOT / "data" / "qa_candidates.txt"
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--per-doc", type=int, default=12)
     ap.add_argument("--min-len", type=int, default=250)
+    ap.add_argument("--chunks", default=str(DEFAULT_CHUNKS))
+    ap.add_argument("--out", default=str(DEFAULT_OUT))
+    ap.add_argument("--max-chars", type=int, default=900, help="truncate each chunk")
     args = ap.parse_args()
+    CHUNKS, OUT = Path(args.chunks), Path(args.out)
 
     by_doc: dict[str, list[dict]] = defaultdict(list)
     for line in CHUNKS.read_text(encoding="utf-8").splitlines():
@@ -46,7 +50,7 @@ def main() -> int:
         key = f'{r["doc_id"]}::{r["position"]}'
         meta = f'page={r["page"]} section={r["section"]}'
         lines.append(f"===== {key} | {meta} =====")
-        lines.append(r["text"].strip())
+        lines.append(r["text"].strip()[: args.max_chars])
         lines.append("")
     OUT.write_text("\n".join(lines), encoding="utf-8")
     print(f"Wrote {len(picked)} candidates -> {OUT}")

@@ -1,0 +1,51 @@
+# Văn bản pháp quy các TỈNH KHÁC (không phải Điện Biên).
+# Dùng để thử: thêm vào TRAIN xem có nâng chất lượng trên tập test Điện Biên đã đóng băng không.
+# Cùng thể loại (quyết định/nghị quyết UBND-HĐND cấp tỉnh) → khác hẳn Zalo (luật trung ương).
+https://congbao.sonla.gov.vn/congbao.nsf/29B2B180F2EE6F7047258C8B0036064A/$file/QD%201103_signed.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/18AD49DC1AF4B42F47258CA00034799E/$file/QD%201304_signed.pdf
+# KHONG TAI DUOC (bo qua de khoi ton 60s timeout moi lan chay):
+#   vinhphuc.gov.vn, daklak.gov.vn -> connect timeout; thanhhoa -> 404
+# https://congbao.vinhphuc.gov.vn/congbao/congbao.nsf/571B589FA797B845472585960013C7D9/$file/1476-QD-UBND-23-06-2020_signed.pdf
+# https://congbao.vinhphuc.gov.vn/congbao/congbao.nsf/C298A3CFC1455ADD47258BD400092552/$file/1653-QD-CT-08-11-2024_signed.pdf
+# https://congbao.thanhhoa.gov.vn/congbao/congbao_th.nsf/869BD425AE2BCF9D47258AF50018A234/$file/d991.pdf
+# https://congbao.daklak.gov.vn/FileCongBao/20250508160606_cb_3031%20-%2008052025153101%20(1).pdf
+https://congbao.sonla.gov.vn/congbao.nsf/E88ED37D77F93CE647258E3700360721/$file/QD%201764.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/7DEBA555FDA9477447258E370017829A/$file/QD%201760.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/1A28B44FFC7C809F47258E3700175022/$file/QD%201753.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/51B9B8D500B8C06347258E340010CCAC/$file/QD%201748.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/12A185CE262AA48547258E33002A4C1A/$file/QD%20so%2038.2026.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/2979FBD220E3084E47258E33002A7EF2/$file/QD%20so%2037.2026.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/CB0AEF89D7F772C447258E3300119710/$file/QD%201744.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/7ADA2D436343CAF547258E3300120EF7/$file/QD%201743.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/7210F3A339F5C4DF47258E2F000F18E5/$file/QD%201729.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/C96CD5E709297C1F47258E33000F1F4E/$file/QD%201728.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/A4787DFF265AD9CF47258E33000F647B/$file/QD%201727.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/5ED98465B825978647258E33000FA63B/$file/QD%201726.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/98FDE273C3EC0ACD47258E33002A27BC/$file/QD%20so%201725.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/6A6E9F83C440789B47258E33000FE925/$file/QD%201724.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/6A6E9F83C440789B47258E33000FE925/$file/QD%201724.F1.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/8698F8F18AB97A3147258E3300103B7C/$file/QD%201721.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/33C41E329202302A47258E33000E1EEA/$file/QD%201709.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/C115A27CC1F52C4A47258E33000DF2A8/$file/QD%201708.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/C7944F7A256F09A747258E2F000AF9F9/$file/QD%201703.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/D62693EF6C1081BA47258E2F000AC805/$file/QD%201702.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/86473594114B571D47258E2E0032C367/$file/QD%201688.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/0EEBC33DE9FF298047258E2E0032E8B0/$file/QD%201687.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/0467B15081E3254347258E2E00335AA7/$file/QD%201686.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/3153CC0F24366F1F47258E2D0037F2DA/$file/QD%201683.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/AD0AD508A2B8EFA347258E2D00385773/$file/QD%201680.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/DABA46241AA99F4E47258E2D0038272A/$file/QD%201679.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/29D070A9F03EE67D47258E2D0036ACB4/$file/QD%201672.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/109C3E66D81A01AD47258E2D0035959E/$file/QD%201644.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/D086C249A80DD16747258E2D0035EEC7/$file/QD%201643.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/5A94B245068495A847258E2D00361A1A/$file/QD%201642.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/C0617F31D54EF45E47258E2D0011CBD7/$file/QD%201633.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/C0617F31D54EF45E47258E2D0011CBD7/$file/QD%201633.F1.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/8CE364D203D0A35547258E2D00356D67/$file/QD%201632.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/8EBBB28F5B97FA0847258E2D001246A6/$file/QD%201631.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/5FDA39649B30723847258E2D00104A78/$file/QD%201629.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/D440F4137973732247258E2D0011150D/$file/QD%201626.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/A06C8918B9B6BE3E47258E2D001021B1/$file/QD%201622.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/904D8EF4CAEF671547258E2D000CE28F/$file/QD%201619.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/F3FCD38436CE330A47258E2D000E6D9E/$file/QD%201618.pdf
+https://congbao.sonla.gov.vn/congbao.nsf/F3FCD38436CE330A47258E2D000E6D9E/$file/QD%201618.F1.pdf

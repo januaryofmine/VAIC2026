@@ -28,10 +28,10 @@ from rank_bm25 import BM25Okapi
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parents[1]
-CHUNKS = ROOT / "data" / "chunks.jsonl"
-QA = ROOT / "data" / "qa.jsonl"
-TRAIN = ROOT / "data" / "train_indomain.jsonl"
-EVAL = ROOT / "data" / "eval_indomain.jsonl"
+D_CHUNKS = ROOT / "data" / "chunks.jsonl"
+D_QA = ROOT / "data" / "qa.jsonl"
+D_TRAIN = ROOT / "data" / "train_indomain.jsonl"
+D_EVAL = ROOT / "data" / "eval_indomain.jsonl"
 
 RNG = random.Random(42)  # deterministic (Math.random-free, reproducible)
 
@@ -43,8 +43,19 @@ def tok(s: str) -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--neg", type=int, default=6, help="hard negatives per query")
-    ap.add_argument("--test-frac", type=float, default=0.35, help="held-out fraction for eval")
+    ap.add_argument(
+        "--test-frac",
+        type=float,
+        default=0.35,
+        help="held-out fraction for eval; 0 = everything goes to train (extra corpora)",
+    )
+    ap.add_argument("--chunks", default=str(D_CHUNKS))
+    ap.add_argument("--qa", default=str(D_QA))
+    ap.add_argument("--train-out", default=str(D_TRAIN))
+    ap.add_argument("--eval-out", default=str(D_EVAL))
     args = ap.parse_args()
+    CHUNKS, QA = Path(args.chunks), Path(args.qa)
+    TRAIN, EVAL = Path(args.train_out), Path(args.eval_out)
 
     chunks = [json.loads(l) for l in CHUNKS.read_text(encoding="utf-8").splitlines()]
     by_id = {f'{c["doc_id"]}::{c["position"]}': c for c in chunks}

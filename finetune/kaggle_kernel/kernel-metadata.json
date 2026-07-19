@@ -1,0 +1,13 @@
+{
+  "id": "honglongdng/vaic-reranker",
+  "title": "VAIC Reranker",
+  "code_file": "kaggle_reranker.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["honglongdng/vaic-finetune"],
+  "competition_sources": [],
+  "kernel_sources": []
+}

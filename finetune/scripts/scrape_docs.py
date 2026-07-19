@@ -21,8 +21,8 @@ from bs4 import BeautifulSoup
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # gov TLS chains
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW = ROOT / "data" / "raw"
-SOURCES = ROOT / "sources.txt"
+DEFAULT_RAW = ROOT / "data" / "raw"
+DEFAULT_SOURCES = ROOT / "sources.txt"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) VAIC2026-research/0.1"
@@ -60,6 +60,14 @@ def _save_html_text(url: str, dest: Path) -> None:
 
 
 def main() -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--sources", default=str(DEFAULT_SOURCES))
+    ap.add_argument("--out", default=str(DEFAULT_RAW), help="dir to save downloads into")
+    args = ap.parse_args()
+    RAW, SOURCES = Path(args.out), Path(args.sources)
+
     RAW.mkdir(parents=True, exist_ok=True)
     if not SOURCES.exists():
         print(f"Missing {SOURCES}. Add one URL per line.", file=sys.stderr)
