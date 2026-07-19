@@ -43,3 +43,6 @@ deploy/.secrets
 
 # AI monitoring: trace sink cục bộ (LLM_TRACE_FILE) — dữ liệu chạy, không commit
 .llm-trace*.jsonl
+
+# Playwright MCP local test artifacts
+.playwright-mcp/

@@ -40,10 +40,32 @@ _FILE_SQL = """
 """
 
 
+# Single-purpose ownership lookup for the BFF authorization guard: returns only the
+# owner id (never document content), so a foreign document_id can be rejected before
+# any data-serving endpoint runs. user_id is NULL for pre-Slice-18 documents.
+_OWNER_SQL = """
+    SELECT user_id::text AS user_id
+    FROM documents
+    WHERE id = %(id)s::uuid
+"""
+
+
 def fetch_document_file(conn: psycopg.Connection, document_id: str) -> dict | None:
     """Return {filename, doc_type, storage_path} for serving the original blob, or None."""
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(_FILE_SQL, {"id": document_id})
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def fetch_document_owner(conn: psycopg.Connection, document_id: str) -> dict | None:
+    """Return {"user_id": str | None} for the document, or None if it does not exist.
+
+    None (no row) and {"user_id": None} (row exists, unowned) are distinct: the router
+    maps the former to 404 and the latter to a 200 the BFF treats as "deny".
+    """
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(_OWNER_SQL, {"id": document_id})
         row = cur.fetchone()
         return dict(row) if row else None
 

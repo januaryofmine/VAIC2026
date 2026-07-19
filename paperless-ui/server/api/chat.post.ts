@@ -20,6 +20,8 @@ export default defineEventHandler(async (event) => {
   if (!messages?.length) {
     throw createError({ statusCode: 400, statusMessage: "messages are required" });
   }
+  // Authorize before any retrieval or LLM call: signed in AND owns this document.
+  await requireDocumentAccess(event, document_id);
 
   const config = useRuntimeConfig();
 
@@ -55,6 +57,7 @@ export default defineEventHandler(async (event) => {
         position: c.position,
         page: c.page,
         section: c.section,
+        text: c.text,
       }));
 
       // Surface the search plan (the sub-queries the retriever fanned out on) so the
@@ -85,6 +88,14 @@ export default defineEventHandler(async (event) => {
           }
         },
       });
+
+      // Force the generation to finish server-side so onFinish (which persists the turn)
+      // always runs — even if the client disconnects mid-stream, which would otherwise
+      // stall generation and lose the whole turn. On serverless (Vercel) waitUntil keeps
+      // the function alive until the save completes; it is undefined on the local
+      // node-server preset, hence the optional call.
+      const finished = result.consumeStream();
+      event.context.waitUntil?.(finished);
 
       writer.merge(
         result.toUIMessageStream({

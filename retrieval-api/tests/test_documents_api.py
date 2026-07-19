@@ -140,5 +140,34 @@ def test_list_documents_requires_user_id():
     assert _client().get("/api/documents").status_code == 422
 
 
+def test_owner_ok(monkeypatch):
+    monkeypatch.setattr(
+        documents_router, "fetch_document_owner", lambda conn, doc_id: {"user_id": _USER_ID}
+    )
+    r = _client().get(f"/api/documents/{_DOC_ID}/owner")
+    assert r.status_code == 200
+    assert r.json() == {"document_id": _DOC_ID, "user_id": _USER_ID}
+
+
+def test_owner_null_when_unowned(monkeypatch):
+    # A pre-Slice-18 document with no owner still returns 200 with user_id=null;
+    # the caller (BFF) decides that null ownership means "deny".
+    monkeypatch.setattr(
+        documents_router, "fetch_document_owner", lambda conn, doc_id: {"user_id": None}
+    )
+    r = _client().get(f"/api/documents/{_DOC_ID}/owner")
+    assert r.status_code == 200
+    assert r.json() == {"document_id": _DOC_ID, "user_id": None}
+
+
+def test_owner_404_when_absent(monkeypatch):
+    monkeypatch.setattr(documents_router, "fetch_document_owner", lambda conn, doc_id: None)
+    assert _client().get(f"/api/documents/{_DOC_ID}/owner").status_code == 404
+
+
+def test_owner_invalid_uuid_422():
+    assert _client().get("/api/documents/not-a-uuid/owner").status_code == 422
+
+
 def test_healthz():
     assert _client().get("/api/healthz").json() == {"status": "ok"}

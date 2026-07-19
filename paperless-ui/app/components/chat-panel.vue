@@ -6,6 +6,7 @@ import type { Source } from "~/utils/citations";
 const props = defineProps<{ documentId: string }>();
 
 const { messages, status, send } = useDocChat(props.documentId);
+const { requestJump } = useDocJump();
 const input = ref("");
 const busy = computed(() => status.value === "submitted" || status.value === "streaming");
 
@@ -53,7 +54,12 @@ function sourcesOf(m: UIMessage): Source[] {
                 : 'bg-[var(--ui-bg-elevated)]',
             ]"
           >
-            {{ textOf(m) }}
+            <span
+              v-if="m.role === 'assistant'"
+              class="chat-md"
+              v-html="renderMarkdown(textOf(m))"
+            />
+            <template v-else>{{ textOf(m) }}</template>
           </div>
           <div
             v-if="m.role === 'assistant' && sourcesOf(m).length"
@@ -67,6 +73,9 @@ function sourcesOf(m: UIMessage): Source[] {
               variant="soft"
               size="sm"
               icon="i-lucide-quote"
+              :class="s.page != null ? 'cursor-pointer hover:bg-[var(--ui-bg-accented)]' : ''"
+              :title="s.page != null ? 'Xem trong tài liệu' : undefined"
+              @click="s.page != null && requestJump(s)"
             >
               {{ citationLabel(s) }}
             </UBadge>
@@ -107,3 +116,19 @@ function sourcesOf(m: UIMessage): Source[] {
     </template>
   </UCard>
 </template>
+
+<style scoped>
+.chat-md :deep(strong) {
+  font-weight: 600;
+}
+.chat-md :deep(em) {
+  font-style: italic;
+}
+.chat-md :deep(code) {
+  border-radius: 4px;
+  background: var(--ui-bg-accented);
+  padding: 0 4px;
+  font-size: 0.85em;
+  font-family: ui-monospace, monospace;
+}
+</style>

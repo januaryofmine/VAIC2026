@@ -15,12 +15,14 @@ router never requires rag-pipeline to be present — local retrieval-api keeps w
 This deploy keeps the self-hosted e5 embedder (no provider swap).
 """
 
+import json
 import logging
 import os
 import shutil
 import sys
 import tempfile
 import threading
+import urllib.request
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
@@ -40,6 +42,35 @@ _embedder = None  # reuse one E5 embedder across uploads
 # How long to wait for the row to be created before giving up (parse of a big PDF
 # can take a few seconds before the id is emitted; embedding continues after).
 _EARLY_TIMEOUT_S = 120
+
+# The BFF generates 3 kinds (each a map-reduce over the doc) → allow a generous window.
+_PREP_PACK_TIMEOUT_S = 600
+
+
+def _trigger_prep_pack(document_id: str | None, settings) -> None:
+    """Ask the BFF to generate + persist the prep-pack once a doc is embedded, so
+    summary/terms/questions exist without a user opening the doc (backend-driven).
+
+    Best-effort: no-ops when unconfigured and NEVER raises — a BFF hiccup must not
+    fail ingestion (the on-open endpoints remain a fallback).
+    """
+    if not document_id or not settings.bff_url:
+        return
+    url = settings.bff_url.rstrip("/") + "/api/internal/prep-pack"
+    body = json.dumps({"document_id": document_id}).encode()
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", "X-API-Key": settings.api_key},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_PREP_PACK_TIMEOUT_S) as resp:
+            logger.info(
+                "prep-pack generation triggered for %s (bff %s)", document_id, resp.status
+            )
+    except Exception as e:  # noqa: BLE001 — best-effort; log and move on
+        logger.warning("prep-pack trigger failed for %s: %s", document_id, e)
 
 
 def _load_rag():
@@ -125,6 +156,9 @@ def ingest_endpoint(
                 )
             finally:
                 conn.close()
+            # Embedding done (doc is 'ready') → generate + store the prep-pack now,
+            # server-side, so it never depends on a user opening the doc.
+            _trigger_prep_pack(created.get("id"), settings)
         except Exception as e:  # unblock the waiter so it can report the failure
             logger.error("ingest failed for %s: %s", name, e, exc_info=True)
             failure["error"] = str(e)

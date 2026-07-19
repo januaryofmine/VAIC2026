@@ -1,15 +1,7 @@
 export default defineEventHandler(async (event) => {
-  const { ai } = useRuntimeConfig();
   // AI monitoring: gom map + reduce của lần trích thuật ngữ này vào một trace.
+  // Shared compute (prepComputers) so this matches the backend-driven ingest trigger.
   return await runWithTrace(newTraceId(), () =>
-    cachedPrepPack(event, "terms", async (doc) => {
-      const { terms } = await mapReduceDocument(
-        doc.chunks,
-        createAnthropicTermsExtractor(),
-        ai.mapGroupChars,
-        ai.mapConcurrency,
-      );
-      return terms;
-    }),
+    cachedPrepPack(event, "terms", prepComputers.terms),
   );
 });
