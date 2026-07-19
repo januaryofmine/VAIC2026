@@ -25,7 +25,7 @@ defineProps<{ questions: string[] | null; pending: boolean; error: unknown }>();
       title="Không tạo được câu hỏi"
     />
     <ol v-else-if="questions" class="list-decimal space-y-2 pl-5 text-sm" data-testid="questions-content">
-      <li v-for="(q, i) in questions" :key="i">{{ q }}</li>
+      <li v-for="(q, i) in questions" :key="i">{{ stripLeadingEnumeration(q) }}</li>
     </ol>
   </UCard>
 </template>
