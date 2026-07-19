@@ -76,3 +76,58 @@ describe("llm-trace: tương quan traceId", () => {
     await expect(readFile(TRACE_FILE, "utf8")).rejects.toThrow(); // file không tồn tại
   });
 });
+
+describe("llm-trace: instrumentFetch bắt input/output", () => {
+  beforeEach(async () => {
+    process.env.LLM_TRACE_FILE = TRACE_FILE;
+    await rm(TRACE_FILE, { force: true });
+  });
+  afterEach(async () => {
+    delete process.env.LLM_TRACE_FILE;
+    await rm(TRACE_FILE, { force: true });
+  });
+
+  async function lastRecord() {
+    const lines = (await readFile(TRACE_FILE, "utf8")).trim().split("\n");
+    return JSON.parse(lines[lines.length - 1]);
+  }
+
+  it("gộp cả `system` (grounding của Anthropic) vào input, không chỉ messages", async () => {
+    const { instrumentFetch, flushTraces } = await loadModule();
+    const fakeInner = async () =>
+      new Response(
+        JSON.stringify({ model: "m", content: [{ type: "text", text: "hi" }], usage: { input_tokens: 5, output_tokens: 2 } }),
+        { headers: { "content-type": "application/json" } },
+      );
+    const f = instrumentFetch(fakeInner as typeof globalThis.fetch);
+    await f("https://x/api", {
+      method: "POST",
+      body: JSON.stringify({ model: "m", system: "NGỮ-CẢNH-luật", messages: [{ role: "user", content: "q" }] }),
+    });
+    await flushTraces();
+
+    const rec = await lastRecord();
+    // điểm mấu chốt: chat để grounding ở `system` → phải có mặt trong trace
+    expect(rec.input.system).toBe("NGỮ-CẢNH-luật");
+    expect(rec.input.messages).toEqual([{ role: "user", content: "q" }]);
+    expect(rec.output).toBeTruthy();
+    expect(rec.usage.input).toBe(5);
+  });
+
+  it("streaming: không đọc body nhưng vẫn ghi input kèm system", async () => {
+    const { instrumentFetch, flushTraces } = await loadModule();
+    const fakeInner = async () =>
+      new Response("data: ...", { headers: { "content-type": "text/event-stream" } });
+    const f = instrumentFetch(fakeInner as typeof globalThis.fetch);
+    await f("https://x/api", {
+      method: "POST",
+      body: JSON.stringify({ model: "m", stream: true, system: "S", messages: [{ role: "user", content: "q" }] }),
+    });
+    await flushTraces();
+
+    const rec = await lastRecord();
+    expect(rec.input.system).toBe("S");
+    expect(rec.metadata.streaming).toBe(true);
+    expect(rec.output).toBeUndefined();
+  });
+});

@@ -76,6 +76,9 @@ def _post(events: list[dict]) -> None:
 def _send_async(events: list[dict]) -> None:
     t = threading.Thread(target=_post, args=(events,), daemon=True)
     with _lock:
+        # Dọn thread đã xong để list không phình vô hạn trên server dài hạn (HF Space):
+        # flush() chỉ được gọi ở script/test ngắn hạn, KHÔNG bao giờ ở đường request.
+        _threads[:] = [x for x in _threads if x.is_alive()]
         _threads.append(t)
     t.start()
 

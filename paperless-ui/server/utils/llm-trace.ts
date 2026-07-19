@@ -202,6 +202,48 @@ export function traceLLM(e: TraceLLMInput): void {
   track(send(events)); // không await (không chặn response) nhưng có theo dõi để flushTraces() chờ được
 }
 
+/** Các field ta hé nhìn trong request body (OpenAI-compatible + Anthropic). */
+type LLMRequestBody = {
+  model?: string;
+  stream?: boolean;
+  // Anthropic đặt NGỮ CẢNH tài liệu (grounding) ở `system`, tách khỏi `messages`.
+  system?: unknown;
+  messages?: unknown;
+};
+
+/** Các field ta đọc từ response body (cả hai chuẩn). */
+type LLMResponseBody = {
+  model?: string;
+  content?: unknown; // Anthropic
+  choices?: Array<{ message?: { content?: unknown } }>; // OpenAI-compatible
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+};
+
+function parseBody(init?: RequestInit): LLMRequestBody | null {
+  if (!init?.body || typeof init.body !== "string") return null;
+  try {
+    return JSON.parse(init.body) as LLMRequestBody;
+  } catch {
+    return null; // body không phải JSON
+  }
+}
+
+/**
+ * Input để ghi trace. Với Anthropic, ngữ cảnh tài liệu (grounding) nằm ở field
+ * `system` TÁCH KHỎI `messages` — nếu chỉ ghi `messages` thì trace của chat KHÔNG
+ * có phần grounding để chấm groundedness sau này. Gộp cả hai khi có `system`.
+ */
+function traceInput(req: LLMRequestBody | null): unknown {
+  if (!req) return req;
+  return req.system !== undefined ? { system: req.system, messages: req.messages } : req.messages;
+}
+
 /**
  * Bọc một `fetch` để mọi lời gọi LLM (OpenAI-compatible hoặc Anthropic) đều
  * được ghi trace. Đặt ở provider.ts nên tất cả điểm gọi (summarize / terms /
@@ -212,14 +254,7 @@ export function instrumentFetch(inner: typeof globalThis.fetch): typeof globalTh
 
   return async (input, init) => {
     const startTime = new Date();
-    let req: any = null;
-    if (init?.body && typeof init.body === "string") {
-      try {
-        req = JSON.parse(init.body);
-      } catch {
-        /* body không phải JSON */
-      }
-    }
+    const req = parseBody(init);
     const model = req?.model ?? "unknown";
     const streaming = req?.stream === true;
 
@@ -230,7 +265,7 @@ export function instrumentFetch(inner: typeof globalThis.fetch): typeof globalTh
       traceLLM({
         name: "llm-call",
         model,
-        input: req?.messages ?? req,
+        input: traceInput(req),
         startTime,
         endTime: new Date(),
         error: err instanceof Error ? err.message : String(err),
@@ -247,7 +282,7 @@ export function instrumentFetch(inner: typeof globalThis.fetch): typeof globalTh
       traceLLM({
         name: "llm-call",
         model,
-        input: req?.messages ?? req,
+        input: traceInput(req),
         startTime,
         endTime,
         metadata: { streaming: true, status: res.status },
@@ -257,12 +292,12 @@ export function instrumentFetch(inner: typeof globalThis.fetch): typeof globalTh
 
     // Không stream: clone để đọc mà không tiêu thụ response gốc.
     try {
-      const data: any = await res.clone().json();
+      const data = (await res.clone().json()) as LLMResponseBody;
       const choice = data?.choices?.[0]?.message?.content ?? data?.content;
       traceLLM({
         name: "llm-call",
         model: data?.model ?? model,
-        input: req?.messages ?? req,
+        input: traceInput(req),
         output: choice ?? data,
         usage: data?.usage
           ? {
@@ -279,7 +314,7 @@ export function instrumentFetch(inner: typeof globalThis.fetch): typeof globalTh
       traceLLM({
         name: "llm-call",
         model,
-        input: req?.messages ?? req,
+        input: traceInput(req),
         startTime,
         endTime,
         metadata: { status: res.status, note: "response not JSON" },
