@@ -145,12 +145,53 @@ File: `data/train_dienbien_v2.jsonl` (A) · `data/train_multiprovince_v3.jsonl` 
 Notebook: `kaggle_kernel/kaggle_reranker.ipynb` (kernel v13) — in ra số dòng thực tế của
 từng file trước khi train, để **tin số đếm chứ không tin tên file** (bài học vòng 1).
 
-### Trạng thái
-⏳ Kernel v13 đang chạy. Kết quả sẽ ghi bổ sung vào đây và vào `RESULTS.md`.
+### Kết quả vòng 2 (kernel v13, đo xong 19/07)
 
-Điều cần lưu ý khi đọc kết quả: nếu A trên test-33 **thấp hơn** 0.889 của test-18, đó
-**không phải model tệ đi** — mà là tập test cũ dễ hơn (đã chạm trần). Con số duy nhất có
-nghĩa là **chênh lệch B − A trên cùng test-33**.
+Đã xác nhận kernel nạp đúng file: `TRAIN_A rows = 46`, `TRAIN_B rows = 78`, `EVAL_33 rows = 33`,
+`in-domain triples: 46` → `batches/epoch=40` và `78` → `68`.
+
+| Tầng | Recall@1 | Recall@3 | Recall@5 | MRR | nDCG@5 |
+|---|---|---|---|---|---|
+| e5 retrieval only | 0.6970 | 0.9394 | 0.9697 | 0.8210 | 0.8577 |
+| + bge-reranker gốc | 0.7879 | 0.9697 | 0.9697 | 0.8781 | 0.8986 |
+| **A — LoRA 46 câu Điện Biên** | **0.8485** | 0.9697 | 0.9697 | 0.9134 | 0.9250 |
+| **B — LoRA 78 câu đa tỉnh** | **0.8788** | 0.9697 | 0.9697 | 0.9280 | 0.9361 |
+
+### Đọc kết quả cho đúng
+
+**1. Tập test mới đã làm đúng việc của nó — nó khó hơn thật.** Reranker gốc rớt 0.8333 → 0.7879,
+LoRA rớt 0.8889 → 0.8485. Đây **không phải model tệ đi**; test-18 cũ dễ hơn vì đã chạm trần.
+Mọi so sánh từ nay phải nằm trong cùng một tập test.
+
+**2. Fine-tune vẫn thắng rõ, và biên độ còn rộng hơn trước.**
+LoRA − gốc = **+0.0606** (A) và **+0.0909** (B) — tức 2 và 3 câu trên 33. Trên test cũ chỉ là
++0.0556 (1 câu). Tập test lớn hơn **củng cố** kết luận chính của PR, không làm lung lay nó.
+
+**3. B hơn A đúng 1 câu — CHƯA ĐỦ ĐỂ KẾT LUẬN.**
+A đúng 28/33, B đúng 29/33. Chênh lệch **+0.0303 = đúng một câu hỏi**. Đây là lần đầu dữ liệu
+đa tỉnh cho dấu dương, nhưng phải nói thẳng:
+
+> Một câu trên 33 **không phải bằng chứng**. Kiểm định McNemar với b=1, c=0 cho p = 1,0 —
+> không phân biệt được với nhiễu ngẫu nhiên. Chỉ cần một câu lật chiều là kết quả đảo.
+
+Không được trình bày điều này với giám khảo như "thêm dữ liệu tỉnh khác giúp cải thiện".
+Phát biểu đúng là: **dữ liệu cùng-domain không gây hại, và có dấu hiệu dương chưa đủ mạnh
+để khẳng định.** Muốn khẳng định phải có tập test lớn hơn nhiều (~200+ câu) hoặc chạy nhiều
+seed lấy trung bình.
+
+**4. Phát hiện mới có giá trị: trần đã dịch từ reranker sang retrieval.**
+`Recall@5 = 0.9697` ⇒ có **1/33 câu mà e5 hoàn toàn không truy xuất được đáp án vào top-5**.
+Reranker **không thể cứu câu đó** — nó chỉ sắp xếp lại những gì tầng 1 đưa lên. Trên test-18
+cũ, R@5 = 1.000 nên giới hạn này bị che khuất.
+
+→ Nút thắt tiếp theo **không còn nằm ở reranker** mà ở **tầng truy xuất e5**. Đổ thêm dữ liệu
+train cho reranker sẽ không chạm được tới câu đó.
+
+### Việc nên làm tiếp
+1. Soi **1 câu e5 trượt hoàn toàn** — hỏng vì chunking, vì embedding, hay vì câu hỏi mơ hồ?
+2. Soi **4 câu B còn sai hạng-1** để tìm quy luật, thay vì đổ thêm dữ liệu.
+3. Nếu muốn khẳng định chuyện đa tỉnh: cần tập test ~200 câu, hoặc nhiều seed — chi phí lớn
+   so với giá trị thu được, nên **khuyến nghị dừng nhánh này tại đây**.
 
 ## Ghi chú vận hành
 

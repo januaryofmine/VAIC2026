@@ -28,11 +28,24 @@ khác hẳn Zalo (lệch domain) làm R@1 rớt còn 0.52. Nhưng cũng không c
 **đã chạm trần**: Recall@3 và @5 đều = 1.000, chỉ còn 2/18 câu chưa đạt hạng 1.
 → Nút thắt là **độ phân giải của tập test**, không phải lượng dữ liệu train.
 
-**Vòng 2 — đã xử lý đúng nút thắt đó (19/07):** soạn thêm 26 câu hỏi Điện Biên từ các chunk
-**chưa từng dùng làm đáp án** (`scripts/dump_unused.py` cho thấy 198 chunks nhưng mới dùng 41)
-→ **79 QA**, chia lại grouped **46 train / 33 test**. Mỗi câu test giờ đáng **3,0** điểm phần
-trăm thay vì 5,6. Đang chạy lại **cả hai cấu hình** (46 ĐB vs 78 đa tỉnh) trên tập test mới —
-vì tập test đổi nên số cũ không so trực tiếp được, phải đo lại cả hai để giữ tính kiểm soát.
+**Vòng 2 — mở rộng tập TEST để phá trần đo lường (19/07):** soạn thêm 26 câu hỏi Điện Biên từ
+các chunk **chưa từng dùng làm đáp án** (`scripts/dump_unused.py` cho thấy 198 chunks nhưng mới
+dùng 41) → **79 QA**, chia lại grouped **46 train / 33 test**. Đo lại cả hai cấu hình:
+
+| Tầng (đo trên **33 câu**) | Recall@1 | Recall@5 | MRR | nDCG@5 |
+|---|:---:|:---:|:---:|:---:|
+| e5 retrieval | 0.6970 | 0.9697 | 0.8210 | 0.8577 |
+| + bge-reranker gốc | 0.7879 | 0.9697 | 0.8781 | 0.8986 |
+| **+ LoRA 46 câu Điện Biên** | **0.8485** | 0.9697 | 0.9134 | 0.9250 |
+| + LoRA 78 câu đa tỉnh | 0.8788 | 0.9697 | 0.9280 | 0.9361 |
+
+Ba điều rút ra:
+- **Fine-tune thắng rõ hơn khi test khó hơn**: LoRA − gốc = **+0.0606** (2/33 câu), rộng hơn
+  mức +0.0556 trên test cũ. Tập test lớn hơn **củng cố** kết luận chính.
+- **Đa tỉnh hơn baseline đúng 1 câu** (28/33 → 29/33). Dấu dương nhưng **McNemar p = 1,0** —
+  không phân biệt được với nhiễu. **Không trình bày như một cải thiện đã chứng minh.**
+- **Trần đã dịch sang tầng truy xuất**: `Recall@5 = 0.9697` ⇒ 1/33 câu e5 không đưa được đáp án
+  vào top-5, reranker không thể cứu. Nút thắt tiếp theo nằm ở **e5**, không phải reranker.
 
 Chi tiết: [finetune/EXPERIMENT_MULTIPROVINCE.md](finetune/EXPERIMENT_MULTIPROVINCE.md).
 
