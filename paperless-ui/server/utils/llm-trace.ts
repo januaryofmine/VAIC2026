@@ -1,0 +1,325 @@
+/**
+ * AI monitoring — gửi trace mỗi lần gọi LLM lên Langfuse.
+ *
+ * Vì sao cần: tiêu chí "An toàn AI, Grounding & Độ tin cậy" và lộ trình pilot ở
+ * UBND đòi hỏi *đo được* chứ không chỉ tuyên bố. Trace cho ta latency thật
+ * (chứng minh yêu cầu tóm tắt < 60s), token/chi phí mỗi tài liệu, và input/output
+ * để chấm groundedness / độ chính xác trích dẫn sau này.
+ *
+ * Thiết kế có chủ đích:
+ * - KHÔNG thêm dependency: POST thẳng Langfuse ingestion API bằng fetch.
+ * - No-op khi thiếu key → đồng đội chạy máy không cấu hình gì vẫn bình thường.
+ * - Fire-and-forget + không bao giờ ném lỗi → monitoring không thể làm hỏng request.
+ * - Không đọc body của response streaming (sẽ nuốt mất stream của người dùng).
+ *
+ * Bật: đặt LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY (tuỳ chọn LANGFUSE_BASE_URL)
+ * trong .env. Self-host on-prem chỉ cần đổi LANGFUSE_BASE_URL.
+ */
+
+import { AsyncLocalStorage } from "node:async_hooks";
+
+type Usage = { input?: number; output?: number; total?: number };
+
+/**
+ * Ngữ cảnh trace theo REQUEST.
+ *
+ * Một câu hỏi thực tế gồm nhiều lời gọi: lập kế hoạch (planStrategy) → N lần
+ * truy xuất → sinh câu trả lời. Nếu mỗi lời gọi tự sinh id riêng thì trong
+ * Langfuse chúng thành các mảnh rời, không truy nguyên được "vì sao câu trả lời
+ * này sai". AsyncLocalStorage cho phép route handler đặt id MỘT LẦN rồi mọi lời
+ * gọi bên trong tự nhặt lấy — không phải sửa chữ ký của getModel / từng utils.
+ */
+const traceContext = new AsyncLocalStorage<{ traceId: string }>();
+
+export function newTraceId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** Chạy `fn` với traceId gắn vào ngữ cảnh — mọi lời gọi LLM bên trong dùng chung id. */
+export function runWithTrace<T>(traceId: string, fn: () => T): T {
+  return traceContext.run({ traceId }, fn);
+}
+
+/** traceId của request hiện tại (nếu handler đã bọc bằng runWithTrace). */
+export function currentTraceId(): string | undefined {
+  return traceContext.getStore()?.traceId;
+}
+
+function config() {
+  const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
+  const secretKey = process.env.LANGFUSE_SECRET_KEY;
+  const baseUrl = process.env.LANGFUSE_BASE_URL || "https://cloud.langfuse.com";
+  if (!publicKey || !secretKey) return null;
+  return { publicKey, secretKey, baseUrl };
+}
+
+/**
+ * Sink cục bộ (JSONL) — bật bằng LLM_TRACE_FILE.
+ * Có chủ đích: bản on-prem ở UBND không nhất thiết được phép gửi trace ra ngoài,
+ * và PoC/CI cần đo được mà không phụ thuộc tài khoản SaaS nào.
+ */
+function traceFile(): string | null {
+  return process.env.LLM_TRACE_FILE || null;
+}
+
+export function isTracingEnabled(): boolean {
+  return config() !== null || traceFile() !== null;
+}
+
+async function appendLocal(record: unknown): Promise<void> {
+  const file = traceFile();
+  if (!file) return;
+  try {
+    const { appendFile } = await import("node:fs/promises");
+    await appendFile(file, JSON.stringify(record) + "\n", "utf8");
+  } catch {
+    // nuốt: lỗi telemetry không được phá luồng chính
+  }
+}
+
+function uuid(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/**
+ * Các lần gửi đang bay. Cần theo dõi vì `traceLLM` là fire-and-forget: trong môi
+ * trường sống ngắn (serverless function, script CLI, test) tiến trình có thể kết
+ * thúc TRƯỚC khi POST xong → trace mất âm thầm. Gọi `flushTraces()` để chờ.
+ */
+const pending = new Set<Promise<unknown>>();
+
+function track(p: Promise<unknown>): void {
+  pending.add(p);
+  void p.finally(() => pending.delete(p));
+}
+
+/** Chờ mọi trace đang bay gửi xong. Gọi trước khi tiến trình/handler kết thúc. */
+export async function flushTraces(): Promise<void> {
+  await Promise.allSettled([...pending]);
+}
+
+/** Gửi 1 batch sự kiện. Nuốt mọi lỗi — monitoring không được phá luồng chính. */
+async function send(events: unknown[]): Promise<void> {
+  const cfg = config();
+  if (!cfg || events.length === 0) return;
+  const debug = !!process.env.LLM_TRACE_DEBUG;
+  try {
+    const auth = Buffer.from(`${cfg.publicKey}:${cfg.secretKey}`).toString("base64");
+    const res = await globalThis.fetch(`${cfg.baseUrl}/api/public/ingestion`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Basic ${auth}` },
+      body: JSON.stringify({ batch: events }),
+    });
+    // Ingestion trả 207: từng event có status riêng — lỗi schema nằm trong `errors`.
+    if (debug) {
+      const text = await res.clone().text();
+      console.warn(`[llm-trace] ingestion HTTP ${res.status}: ${text.slice(0, 500)}`);
+    }
+  } catch (err) {
+    // Vẫn nuốt (telemetry không được phá luồng chính) nhưng bật LLM_TRACE_DEBUG=1
+    // để thấy — im lặng tuyệt đối chính là thứ khiến lỗi này vô hình lúc đầu.
+    if (debug) console.warn("[llm-trace] ingestion failed:", err);
+  }
+}
+
+export type TraceLLMInput = {
+  traceId?: string;
+  /** Tên bước: summarize | terms | questions | chat … */
+  name: string;
+  model: string;
+  input: unknown;
+  output?: unknown;
+  usage?: Usage;
+  startTime: Date;
+  endTime: Date;
+  metadata?: Record<string, unknown>;
+  error?: string;
+};
+
+/** Ghi 1 lần gọi LLM (kèm trace bao ngoài) — fire-and-forget. */
+export function traceLLM(e: TraceLLMInput): void {
+  if (!isTracingEnabled()) return;
+  // Ưu tiên id do handler đặt (runWithTrace) → mọi lời gọi của cùng một câu hỏi
+  // gom về MỘT trace. Không có thì mới sinh id rời.
+  const traceId = e.traceId ?? currentTraceId() ?? uuid();
+  const now = new Date().toISOString();
+  const latencyMs = e.endTime.getTime() - e.startTime.getTime();
+
+  // Sink cục bộ: bản ghi phẳng, dễ tính P50/P95 + tổng token bằng script.
+  track(appendLocal({
+    traceId,
+    name: e.name,
+    model: e.model,
+    latencyMs,
+    usage: e.usage,
+    startTime: e.startTime.toISOString(),
+    endTime: e.endTime.toISOString(),
+    error: e.error,
+    metadata: e.metadata,
+    input: e.input,
+    output: e.output,
+  }));
+
+  const events = [
+    {
+      id: uuid(),
+      type: "trace-create",
+      timestamp: now,
+      body: {
+        id: traceId,
+        name: e.name,
+        timestamp: e.startTime.toISOString(),
+        metadata: e.metadata,
+        tags: ["paperless-meetings"],
+      },
+    },
+    {
+      id: uuid(),
+      type: "generation-create",
+      timestamp: now,
+      body: {
+        id: uuid(),
+        traceId,
+        name: e.name,
+        startTime: e.startTime.toISOString(),
+        endTime: e.endTime.toISOString(),
+        model: e.model,
+        input: e.input,
+        output: e.error ? { error: e.error } : e.output,
+        usage: e.usage
+          ? { input: e.usage.input, output: e.usage.output, total: e.usage.total, unit: "TOKENS" }
+          : undefined,
+        level: e.error ? "ERROR" : "DEFAULT",
+        statusMessage: e.error,
+        metadata: {
+          ...e.metadata,
+          latencyMs: e.endTime.getTime() - e.startTime.getTime(),
+        },
+      },
+    },
+  ];
+
+  track(send(events)); // không await (không chặn response) nhưng có theo dõi để flushTraces() chờ được
+}
+
+/** Các field ta hé nhìn trong request body (OpenAI-compatible + Anthropic). */
+type LLMRequestBody = {
+  model?: string;
+  stream?: boolean;
+  // Anthropic đặt NGỮ CẢNH tài liệu (grounding) ở `system`, tách khỏi `messages`.
+  system?: unknown;
+  messages?: unknown;
+};
+
+/** Các field ta đọc từ response body (cả hai chuẩn). */
+type LLMResponseBody = {
+  model?: string;
+  content?: unknown; // Anthropic
+  choices?: Array<{ message?: { content?: unknown } }>; // OpenAI-compatible
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+};
+
+function parseBody(init?: RequestInit): LLMRequestBody | null {
+  if (!init?.body || typeof init.body !== "string") return null;
+  try {
+    return JSON.parse(init.body) as LLMRequestBody;
+  } catch {
+    return null; // body không phải JSON
+  }
+}
+
+/**
+ * Input để ghi trace. Với Anthropic, ngữ cảnh tài liệu (grounding) nằm ở field
+ * `system` TÁCH KHỎI `messages` — nếu chỉ ghi `messages` thì trace của chat KHÔNG
+ * có phần grounding để chấm groundedness sau này. Gộp cả hai khi có `system`.
+ */
+function traceInput(req: LLMRequestBody | null): unknown {
+  if (!req) return req;
+  return req.system !== undefined ? { system: req.system, messages: req.messages } : req.messages;
+}
+
+/**
+ * Bọc một `fetch` để mọi lời gọi LLM (OpenAI-compatible hoặc Anthropic) đều
+ * được ghi trace. Đặt ở provider.ts nên tất cả điểm gọi (summarize / terms /
+ * questions / chat) đều được bao mà không phải sửa từng nơi.
+ */
+export function instrumentFetch(inner: typeof globalThis.fetch): typeof globalThis.fetch {
+  if (!isTracingEnabled()) return inner; // không cấu hình → trả nguyên bản
+
+  return async (input, init) => {
+    const startTime = new Date();
+    const req = parseBody(init);
+    const model = req?.model ?? "unknown";
+    const streaming = req?.stream === true;
+
+    let res: Response;
+    try {
+      res = await inner(input, init);
+    } catch (err) {
+      traceLLM({
+        name: "llm-call",
+        model,
+        input: traceInput(req),
+        startTime,
+        endTime: new Date(),
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+
+    const endTime = new Date();
+    // Response streaming: KHÔNG đọc body (sẽ nuốt mất stream) — chỉ ghi latency.
+    const isStream =
+      streaming || (res.headers.get("content-type") ?? "").includes("text/event-stream");
+
+    if (isStream) {
+      traceLLM({
+        name: "llm-call",
+        model,
+        input: traceInput(req),
+        startTime,
+        endTime,
+        metadata: { streaming: true, status: res.status },
+      });
+      return res;
+    }
+
+    // Không stream: clone để đọc mà không tiêu thụ response gốc.
+    try {
+      const data = (await res.clone().json()) as LLMResponseBody;
+      const choice = data?.choices?.[0]?.message?.content ?? data?.content;
+      traceLLM({
+        name: "llm-call",
+        model: data?.model ?? model,
+        input: traceInput(req),
+        output: choice ?? data,
+        usage: data?.usage
+          ? {
+              input: data.usage.prompt_tokens ?? data.usage.input_tokens,
+              output: data.usage.completion_tokens ?? data.usage.output_tokens,
+              total: data.usage.total_tokens,
+            }
+          : undefined,
+        startTime,
+        endTime,
+        metadata: { status: res.status },
+      });
+    } catch {
+      traceLLM({
+        name: "llm-call",
+        model,
+        input: traceInput(req),
+        startTime,
+        endTime,
+        metadata: { status: res.status, note: "response not JSON" },
+      });
+    }
+    return res;
+  };
+}

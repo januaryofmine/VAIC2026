@@ -41,5 +41,8 @@ docs/Tasks/
 # deploy secrets (Supabase pw, tokens, DATABASE_URL cloud) — never commit
 deploy/.secrets
 
+# AI monitoring: trace sink cục bộ (LLM_TRACE_FILE) — dữ liệu chạy, không commit
+.llm-trace*.jsonl
+
 # Playwright MCP local test artifacts
 .playwright-mcp/

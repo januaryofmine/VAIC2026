@@ -25,8 +25,13 @@ export default defineEventHandler(async (event) => {
 
   const config = useRuntimeConfig();
 
+  // AI monitoring: một id cho cả câu hỏi. Mọi lời gọi LLM bên trong (lập kế hoạch,
+  // sinh câu trả lời) tự nhặt id này qua AsyncLocalStorage, còn retrieval-api nhận
+  // qua header X-Trace-Id → Langfuse hiện MỘT trace UI→RAG→LLM thay vì các mảnh rời.
+  const traceId = newTraceId();
+
   const stream = createUIMessageStream({
-    execute: async ({ writer }) => {
+    execute: async ({ writer }) => runWithTrace(traceId, async () => {
       const extracted = extractQuestion(messages);
       if (!extracted) {
         throw createError({ statusCode: 400, statusMessage: "no user message" });
@@ -42,7 +47,7 @@ export default defineEventHandler(async (event) => {
       const strategy = await planStrategy(question, history, ai.planModel, ai.temperature);
       const results = await Promise.all(
         strategy.subqueries.map((sq) =>
-          retrieveChunks(sq.query, document_id, [], ai.askTopK),
+          retrieveChunks(sq.query, document_id, [], ai.askTopK, traceId),
         ),
       );
       const chunks = mergeAndDedupe(results, ai.askMaxChunks);
@@ -99,7 +104,7 @@ export default defineEventHandler(async (event) => {
           },
         }),
       );
-    },
+    }),
   });
 
   return createUIMessageStreamResponse({ stream });
