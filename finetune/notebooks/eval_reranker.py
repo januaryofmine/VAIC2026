@@ -108,6 +108,8 @@ def main() -> None:
     ap.add_argument("--base-model", default="BAAI/bge-reranker-v2-m3")
     ap.add_argument("--finetuned", default="bge-reranker-dienbien")
     ap.add_argument("--e5-model", default="intfloat/multilingual-e5-large")
+    ap.add_argument("--e5-finetuned", default=None,
+                    help="local dir of a contrastively fine-tuned e5 (train_retriever.py)")
     ap.add_argument("--max-len", type=int, default=512)
     ap.add_argument("--skip-e5", action="store_true")
     args = ap.parse_args()
@@ -131,6 +133,20 @@ def main() -> None:
             lambda q, ts: e5_scores(e5, e5_tok, device, q, ts))
         del e5
         torch.cuda.empty_cache() if device == "cuda" else None
+
+    # Stage-1 fine-tune: the point of comparison is against "e5 retrieval only"
+    # above, on the same pools — does training e5 lift retrieval before any
+    # reranking happens?
+    if args.e5_finetuned and Path(args.e5_finetuned).exists():
+        ft_tok = AutoTokenizer.from_pretrained(args.e5_finetuned)
+        ft = AutoModel.from_pretrained(args.e5_finetuned).to(device).eval()
+        results["e5 fine-tuned (retrieval only)"] = eval_ranker(
+            "e5 fine-tuned (retrieval only)", eval_rows, text_of,
+            lambda q, ts: e5_scores(ft, ft_tok, device, q, ts))
+        del ft
+        torch.cuda.empty_cache() if device == "cuda" else None
+    elif args.e5_finetuned:
+        print(f"skip e5 fine-tuned: {args.e5_finetuned} not found")
 
     for name, path in [("+ bge-reranker base", args.base_model),
                        ("+ fine-tuned reranker", args.finetuned)]:
